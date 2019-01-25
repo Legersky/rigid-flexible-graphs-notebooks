@@ -2,7 +2,7 @@
 # Reference: https://mybinder.readthedocs.io/en/latest/dockerfile.html#preparing-your-dockerfile
 
 # FROM sagemath/sagemath:8.4
-FROM computop/sage:d24c8cb
+FROM computop/sage
 
 RUN sage -pip install jupyterlab
 
