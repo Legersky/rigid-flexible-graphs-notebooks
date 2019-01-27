@@ -10,8 +10,12 @@ ARG PHC_VERSION=v2.4.52
 COPY scripts/03_phcpy.sh .
 COPY scripts/makefile_unix.patch . 
 
-RUN  apt-get update \
-  && apt-get install -y wget
+# FROM run-time-dependencies as build-time-dependencies
+# Install the build time dependencies & git & rdfind
+RUN sudo apt-get -qq update \
+&& sudo apt-get -qq install -y wget \
+&& sudo apt-get -qq clean \
+&& sudo rm -r /var/lib/apt/lists/*
 
 
 RUN wget -nv -O /tmp/tarballs/qd.tar.gz \
