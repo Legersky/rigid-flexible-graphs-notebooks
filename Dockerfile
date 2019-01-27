@@ -14,8 +14,9 @@ COPY scripts/makefile_unix.patch .
 RUN apt-get update \
  && apt-get install -y -q --no-install-recommends \
     ca-certificates \
- && apt-get clean \
- && rm -r /var/lib/apt/lists/*
+ && apt-get clean 
+#  \
+#  && rm -r /var/lib/apt/lists/*
 
 RUN wget -nv -O /tmp/tarballs/qd.tar.gz \
         http://crd.lbl.gov/~dhbailey/mpdist/qd-$QD_VERSION.tar.gz && \
