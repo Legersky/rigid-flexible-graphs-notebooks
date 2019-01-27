@@ -21,7 +21,7 @@ unpack_source ()
 
 build_qd ()
 {
-    unpack_source qd
+    unpack_source qd-2.3.22
     cd qd_src
     ./configure --prefix=$SAGE_LOCAL CXX=/usr/bin/g++ CXXFLAGS="-fPIC -O3"
     make -j$N_CORES install
