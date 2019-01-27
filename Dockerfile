@@ -4,7 +4,7 @@
 FROM sagemath/sagemath:8.4
 # FROM computop/sage
 
-ARG QD_VERSION=2.3.17
+ARG QD_VERSION=2.3.22
 ARG PHC_VERSION=v2.4.52
 
 COPY scripts/03_phcpy.sh .
@@ -21,7 +21,8 @@ RUN sudo apt-get -qq update \
 RUN wget -nv -O /tmp/tarballs/qd.tar.gz \
         http://crd.lbl.gov/~dhbailey/mpdist/qd-$QD_VERSION.tar.gz && \
     wget -nv -O /tmp/tarballs/PHC.tar.gz \
-    	https://github.com/janverschelde/PHCpack/archive/$PHC_VERSION.tar.gz && \
+    http://www.math.uic.edu/~jan/x86_64phcv24p.tar.gz && \
+#     	https://github.com/janverschelde/PHCpack/archive/$PHC_VERSION.tar.gz && 
     /bin/bash 03_phcpy.sh /sage /tmp/tarballs  && \
     sudo rm -rf /tmp/scripts/* /tmp/tarballs/* 
 
