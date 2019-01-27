@@ -21,7 +21,7 @@ RUN sudo apt-get -qq update \
 RUN wget -nv -O /tmp/tarballs/qd.tar.gz \
         http://crd.lbl.gov/~dhbailey/mpdist/qd-$QD_VERSION.tar.gz && \
     wget -nv -O /tmp/tarballs/PHC.tar.gz \
-    http://www.math.uic.edu/~jan/x86_64phcv24p.tar.gz && \
+    http://www.math.uic.edu/~jan/PHCv2_4p.tar.gz && \
 #     	https://github.com/janverschelde/PHCpack/archive/$PHC_VERSION.tar.gz && 
     /bin/bash 03_phcpy.sh /sage /tmp/tarballs  && \
     sudo rm -rf /tmp/scripts/* /tmp/tarballs/* 
