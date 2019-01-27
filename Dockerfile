@@ -10,13 +10,9 @@ ARG PHC_VERSION=v2.4.52
 COPY scripts/03_phcpy.sh .
 COPY scripts/makefile_unix.patch . 
 
-# Install wget and install/updates certificates  https://github.com/jwilder/nginx-proxy/issues/79
-RUN apt-get update \
- && apt-get install -y -q --no-install-recommends \
-    ca-certificates \
- && apt-get clean 
-#  \
-#  && rm -r /var/lib/apt/lists/*
+RUN  apt-get update \
+  && apt-get install -y wget
+
 
 RUN wget -nv -O /tmp/tarballs/qd.tar.gz \
         http://crd.lbl.gov/~dhbailey/mpdist/qd-$QD_VERSION.tar.gz && \
