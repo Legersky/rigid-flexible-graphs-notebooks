@@ -2,11 +2,16 @@
 r"""
 This is implementation of motions of a graph.
 
-Methods
--------
+Methods - GraphMotion
+----------------------
 
 
-{INDEX_OF_METHODS}
+{INDEX_OF_METHODS_GRAPH_MOTION}
+
+Methods - ParametricGraphMotion
+-------------------------------
+
+{INDEX_OF_METHODS_PARAMETRIC_GRAPH_MOTION}
 
 AUTHORS:
 
@@ -40,59 +45,36 @@ from sage.rings.integer import Integer
 _sage_const_3 = Integer(3); _sage_const_2 = Integer(2); _sage_const_1 = Integer(1);
 _sage_const_0 = Integer(0); _sage_const_6 = Integer(6); _sage_const_5 = Integer(5);
 _sage_const_4 = Integer(4); _sage_const_13 = Integer(13); _sage_const_12 = Integer(12)
-from sage.rings.rational import Rational
+#from sage.rings.rational import Rational
 from rigid_flexible_graph import RigidFlexibleGraph
 import exceptions
 
-
 class GraphMotion(SageObject):
-    r"""
-
-    """
-    def __init__(self, graph, input_format, active_NACs, data, check):
-        r"""
-
-
-        TODO:
-
-        Doc, examples
-        """
+    def __init__(self, graph):
         if not (isinstance(graph, RigidFlexibleGraph) or 'RigidFlexibleGraph' in str(type(graph))):
             raise exceptions.TypeError('The graph must be of the type RigidFlexibleGraph.')
         self._graph = graph
-        self._parameter = None
-        self._is_parametric = None
-        self._par_type = 'symbolic'
-        self._field = None
+
         self._same_lengths = None
         self._active_NACs = None
-        if input_format == "grid":
-            self._grid2motion(active_NACs[0], data,  check)
-        elif input_format == "parametrization":
-            self._parametrization2motion(active_NACs, data,  check)
-        elif input_format == 'spatial_embedding':
-            self._spatial_embedding2motion(active_NACs, data, check)
-        else:
-            raise exceptions.ValueError('The input format ' + str(input_format) + ' is not supported.')
 
     def _repr_(self):
-        if self._is_parametric:
-            return 'Parametric motion with ' + self._par_type + ' parametrization: ' + str(self.parametrization())
-        else:
-            return 'non-parametric motion is not supported so far!!!'
+        return 'An abstract motion of the graph ' + str(self._graph)
 
-    @staticmethod
-    def GridConstruction(graph,  NAC_coloring,  zigzag=False,  check=True):
-        return GraphMotion(graph, 'grid',  [NAC_coloring],  zigzag, check)
+    @classmethod
+    def GridConstruction(cls, graph,  NAC_coloring,  zigzag=False,  check=True):
+        return ParametricGraphMotion(graph, 'grid',  [NAC_coloring],  zigzag, check)
 
+    @classmethod
+    def ParametrizedMotion(cls, graph, parametrization, par_type, active_NACs=None, sampling_type=None, interval=None, check=True):
+        return ParametricGraphMotion(graph, 'parametrization', active_NACs,
+                                     { 'parametrization' : parametrization,
+                                     'par_type' : par_type,
+                                     'sampling_type' : sampling_type,
+                                     'interval' : interval}, check)
 
-    @staticmethod
-    def ParametrizedMotion(graph, parametrization, par_type,  active_NACs=None, check=True):
-        return GraphMotion(graph, 'parametrization', active_NACs,  { 'parametrization' : parametrization,  'par_type' : par_type}, check)
-
-
-    @staticmethod
-    def Deltoid(par_type='rational'):
+    @classmethod
+    def Deltoid(cls, par_type='rational'):
         r"""
 
         TODO:
@@ -112,7 +94,7 @@ class GraphMotion(SageObject):
                                          _sage_const_6 *(t**_sage_const_3  - _sage_const_2 *t)/(t**_sage_const_4  + _sage_const_5 *t**_sage_const_2  + _sage_const_4 )))
                 }
             G = RigidFlexibleGraph([[0, 1], [1, 2], [2, 3], [0, 3]])
-            return GraphMotion.ParametrizedMotion(G, C, 'rational', check=False)
+            return GraphMotion.ParametrizedMotion(G, C, 'rational', sampling_type='tan', check=False)
         elif par_type == 'symbolic':
             t = var('t')
             C = {
@@ -125,264 +107,18 @@ class GraphMotion(SageObject):
                                          _sage_const_6 *(t**_sage_const_3  - _sage_const_2 *t)/(t**_sage_const_4  + _sage_const_5 *t**_sage_const_2  + _sage_const_4 )))
                 }
             G = RigidFlexibleGraph([[0, 1], [1, 2], [2, 3], [0, 3]])
-            return GraphMotion.ParametrizedMotion(G, C, 'symbolic', check=False)
+            return ParametricGraphMotion.ParametrizedMotion(G, C, 'symbolic', sampling_type='tan', check=False)
+        else:
+            raise exceptions.ValueError('Deltoid with par_type ' + str(par_type) + ' is not supported.')
 
-
-
-    @staticmethod
-    def SpatialEmbeddingConstruction(graph,  active_NACs, check=True, deltoid_motion=None, vertex_at_origin=None, subs_dict={}):
+    @classmethod
+    def SpatialEmbeddingConstruction(cls, graph,  active_NACs, check=True, deltoid_motion=None, vertex_at_origin=None, subs_dict={}):
         data = {
                 'deltoid_motion' : deltoid_motion,
                 'vertex_at_origin' : vertex_at_origin,
                 'subs_dict' : subs_dict
                 }
-        return GraphMotion(graph, 'spatial_embedding', active_NACs, data, check)
-
-    def _grid2motion(self, NAC_coloring, zigzag, check):
-        self._is_parametric = True
-        self._par_type = 'symbolic'
-        alpha = var('alpha')
-        self._field = parent(alpha)
-        self._parameter = alpha
-        self._active_NACs = [NAC_coloring]
-        grid_coor = NAC_coloring.grid_coordinates()
-        self._same_lengths = []
-        for i, edges in enumerate([NAC_coloring.blue_edges(), NAC_coloring.red_edges()]):
-            partition = [[list(edges[0])]]
-            for u, v in edges[1:]:
-                appended = False
-                for part in partition:
-                    u2, v2 = part[0]
-                    if Set([grid_coor[u][i], grid_coor[v][i]]) == Set([grid_coor[u2][i], grid_coor[v2][i]]):
-                        part.append([u, v])
-                        appended = True
-                        break
-                if not appended:
-                    partition.append([[u, v]])
-            self._same_lengths += partition
-
-        if check and len(Set(grid_coor.values())) != self._graph.num_verts():
-            raise exceptions.ValueError('The NAC-coloring does not yield a proper flexible labeling.')
-        if zigzag:
-            if type(zigzag) == list and len(zigzag) == 2:
-                a = [vector(c) for c in zigzag[0]]
-                b = [vector(c) for c in zigzag[1]]
-            else:
-                m = max([k for _, k in grid_coor.values()])
-                n = max([k for k, _ in grid_coor.values()])
-                a = [vector([0.3*((-1)**i-1)+0.3*sin(i), i]) for i in range(0,m+1)]
-                b = [vector([j, 0.3*((-1)**j-1)+0.3*sin(j)]) for j in range(0,n+1)]
-        else:
-            positions = {}
-            m = max([k for _, k in grid_coor.values()])
-            n = max([k for k, _ in grid_coor.values()])
-            a = [vector([0, i]) for i in range(0,m+1)]
-            b = [vector([j, 0]) for j in range(0,n+1)]
-
-        rotation = matrix([[cos(alpha), sin(alpha)], [-sin(alpha), cos(alpha)]])
-        positions = {}
-        for v in self._graph.vertices():
-            positions[v] = rotation * a[grid_coor[v][1]] + b[grid_coor[v][0]]
-        self._parametrization = positions
-
-    def _parametrization2motion(self, active_NACs, data,  check):
-        self._is_parametric = True
-        self._parametrization = data['parametrization']
-        element = (sum([self._parametrization[v][0]**Integer(2) for v in self._parametrization])
-                    + sum([self._parametrization[v][1]**Integer(2) for v in self._parametrization]))
-        self._field = parent(element)
-        for v in self._parametrization:
-            self._parametrization[v] = vector([self._field(x) for x in self._parametrization[v]])
-        if data['par_type'] == 'symbolic':
-            self._par_type = 'symbolic'
-            if len(element.variables()) != 1:
-                raise exceptions.ValueError('The parametrization has to have one parameter (' + str(len(element.variables())) + ' found).')
-            self._parameter = element.variables()[0]
-        if data['par_type'] == 'rational':
-            self._par_type = 'rational'
-            self._parameter = self._field.gen()
-
-        if check:
-            self._edges_with_same_length()
-
-        self._active_NACs = active_NACs
-
-    def _spatial_embedding2motion(self, active_NACs, data,  check):
-        r"""
-        TODO:
-
-        Same lengths.
-        """
-        if data['deltoid_motion'] is None:
-            deltoid_motion = GraphMotion.Deltoid()
-        else:
-            deltoid_motion = data['deltoid_motion']
-
-        self._active_NACs = active_NACs
-        self._field = deltoid_motion._field
-        self._is_parametric = True
-        self._par_type = deltoid_motion._par_type
-        self._parameter = deltoid_motion._parameter
-        self._parametrization = {}
-        C = deltoid_motion.parametrization()
-        uvf = [C[i+1]-C[i] for i in range(0,3)]
-        embedding = self._graph.spatial_embeddings_four_directions(active_NACs[0], active_NACs[1], vertex_at_origin=data['vertex_at_origin'])
-        if embedding is None:
-            raise exceptions.RuntimeError('There is no injective spatial embeddings.')
-        vars = []
-        for v in embedding:
-            vars += list(embedding[v][0].variables())
-            vars += list(embedding[v][1].variables())
-        subs_dict = {}
-        for vrbl in Set(vars):
-            if data['subs_dict'].has_key(str(vrbl)):
-                subs_dict[vrbl] = data['subs_dict'][str(vrbl)]
-            else:
-                subs_dict[vrbl] = Integer(1)
-        for v in embedding:
-            if self._par_type == 'rational':
-                self._parametrization[v] = sum([self._field.constant_field()(xi.subs(subs_dict))*fi for xi,fi in zip(embedding[v],uvf)])
-            elif self._par_type == 'symbolic':
-                self._parametrization[v] = sum([xi.subs(subs_dict)*fi for xi,fi in zip(embedding[v],uvf)])
-
-        if check:
-            self._edges_with_same_length()
-
-
-    def _edges_with_same_length(self):
-        if self._is_parametric:
-            tmp = {}
-            for u, v in self._graph.edges(labels=False):
-                s = self._parametrization[u] - self._parametrization[v]
-                l = s.inner_product(s)
-                if self._par_type == 'rational' and not l in self._field.constant_field():
-                    raise exceptions.ValueError('The edge ' + str((u, v)) + ' does not have constant length.')
-                if self._par_type == 'symbolic':
-                    l = l.simplify_full()
-                    if not l.simplify_full().is_constant():
-                        raise exceptions.ValueError('The edge ' + str((u, v)) + ' does not have constant length.')
-                if tmp.has_key(l):
-                    tmp[l].append([u, v])
-                else:
-                    tmp[l] = [[u, v]]
-            self._same_lengths = tmp.values()
-        else:
-            raise exceptions.NotImplementedError('')
-
-    def edge_lengths(self):
-        if self._is_parametric:
-            res = {}
-            for u, v in self._graph.edges(labels=False):
-                s = self._parametrization[u] - self._parametrization[v]
-                l = s.inner_product(s)
-                if self._par_type == 'rational':
-                    if not l in self._field.constant_field():
-                        raise exceptions.ValueError('The edge ' + str((u, v)) + ' does not have constant length.')
-                    l = self._field.constant_field()(l)
-                elif self._par_type == 'symbolic':
-                    l = l.simplify_full()
-                    if not l.simplify_full().is_constant():
-                        raise exceptions.ValueError('The edge ' + str((u, v)) + ' does not have constant length.')
-                res[(u, v)] = sqrt(l)
-            return res
-        else:
-            raise exceptions.NotImplementedError('')
-
-    def parametrization(self):
-        r"""
-        Return the parametrization.
-
-        TODO:
-
-        Doc, examples
-        """
-        if self._is_parametric:
-            return deepcopy(self._parametrization)
-        else:
-            raise exceptions.RuntimeError('The motion is not parametric.')
-
-
-    def realization(self, value,  numeric=False):
-        r"""
-        Return the realization for given value of the parameter.
-
-        TODO:
-
-        Doc, examples
-        """
-        if self._is_parametric:
-            res = {}
-            if self._par_type == 'symbolic':
-                subs_dict = { self._parameter : value}
-                for v in self._graph.vertices():
-                    if numeric:
-                        res[v] = vector([RR(xi.subs(subs_dict)) for xi in self._parametrization[v]])
-                    else:
-                        res[v] = vector([xi.subs(subs_dict) for xi in self._parametrization[v]])
-                return res
-            elif self._par_type == 'rational':
-                h = self._field.hom(value)
-                for v in self._graph.vertices():
-                    if numeric:
-                        res[v] = vector([RR(h(xi)) for xi in self._parametrization[v]])
-                    else:
-                        res[v] = vector([h(xi) for xi in self._parametrization[v]])
-                return res
-            else:
-                raise exceptions.NotImplementedError('')
-        else:
-            raise exceptions.RuntimeError('The motion is not parametric.')
-
-
-    def sample_parametrization(self, N,  sampling='uniform'):
-        r"""
-        Return a sampling of the motion.
-
-        TODO:
-
-        Doc, examples
-        """
-        if self._is_parametric:
-            interval = []
-            if type(sampling) == list and len(sampling) == 2:
-                sampling_type,  interval = sampling
-            else:
-                sampling_type = sampling
-            if len(interval) != 2:
-                a = -pi
-                b = pi
-            else:
-                a, b = interval
-            if sampling_type == 'uniform':
-                return [self.realization(RR(a + (i/Integer(N)) * (b-a)),  numeric=True) for i in range(0, N+1)]
-            elif sampling_type == 'tan':
-                return [self.realization(tan(RR(a + (i/Integer(N)) * (b-a))/2.0),  numeric=True) for i in range(0, N+1)]
-            else:
-                raise exceptions.NotImplementedError('Sampling ' + str(sampling) + ' is not supported.')
-        else:
-            raise exceptions.RuntimeError('The motion is not parametric.')
-
-    def fix_edge(self, fixed_edge, check=True):
-        if self._is_parametric:
-            u,v = fixed_edge
-            if check and not self._graph.has_edge(u, v):
-                raise exceptions.ValueError('The parameter ``fixed_edge`` must be an edge of the graph.')
-            res = {}
-            direction = self._parametrization[v] - self._parametrization[u]
-            l = sqrt(direction.inner_product(direction))
-            if self._par_type == 'symbolic':
-                l = l.simplify_full()
-            for w in self._parametrization:
-                tmp = self._parametrization[w] - self._parametrization[u]
-                if self._par_type == 'symbolic':
-                    res[w] = vector([((tmp[0]*direction[0] + tmp[1]*direction[1])/l).simplify_full(),
-                                ((tmp[1]*direction[0] - tmp[0]*direction[1])/l).simplify_full()])
-                elif self._par_type == 'rational':
-                    res[w] = vector([((tmp[0]*direction[0] + tmp[1]*direction[1])/l),
-                                ((tmp[1]*direction[0] - tmp[0]*direction[1])/l)])
-            self._parametrization = res
-        else:
-            raise exceptions.RuntimeError('The motion is not parametric.')
+        return ParametricGraphMotion(graph, 'spatial_embedding', active_NACs, data, check)
 
 
     def _minmax_xy(self, embeddings, rel_margin):
@@ -415,8 +151,9 @@ class GraphMotion(SageObject):
                 return [float((x-min_x+(-size_x+size_y)/2)*width/size_y), float((y-min_y)*width/size_y)]
         return shift_scale
 
-    def animation_SVG(self, fileName, sampling='uniform', edge_partition=True, first=None, totalTime=12, width=500,
-                           repetitions='indefinite', radius=15, return_IPythonSVG=True, fps=25,
+
+    def animation_SVG(self, realizations, fileName='', edge_partition=True, first=None, totalTime=12, width=500,
+                           repetitions='indefinite', radius=15, return_IPythonSVG=True,
                            flipY=True,
                            rel_margin=0.1, colors=[],
                            rnd_str=True):
@@ -436,90 +173,88 @@ class GraphMotion(SageObject):
 
         Doc, examples
         """
-        if self._is_parametric:
-            realizations = self.sample_parametrization(totalTime*fps,  sampling)
-            if first==None:
-                first = 2*floor(len(realizations)/3)
+        if first==None:
+            first = 2*floor(len(realizations)/3)
 
-            if flipY:
-                for embd in realizations:
-                    for v in embd:
-                        embd[v][1] = -embd[v][1]
+        if flipY:
+            for embd in realizations:
+                for v in embd:
+                    embd[v][1] = -embd[v][1]
 
-            if rnd_str == True:
-                import hashlib
-                import time
-                from random import random
-                hash_object = hashlib.md5(str(time.time()).encode()+str(random()))
-                rnd_str = '_' + str(hash_object.hexdigest())[:6] + '_'
-            elif type(rnd_str) != str:
-                rnd_str = ''
+        if rnd_str == True:
+            import hashlib
+            import time
+            from random import random
+            hash_object = hashlib.md5(str(time.time()).encode()+str(random()))
+            rnd_str = '_' + str(hash_object.hexdigest())[:6] + '_'
+        elif type(rnd_str) != str:
+            rnd_str = ''
 
-            totalTime = str(totalTime)+'s'
-            shift_scale = self._shift_scale_fun(realizations,  rel_margin, width)
-            with open(fileName+'.svg','w') as f:
-                f.write('<svg width="'+str(width)+'" height="'+str(width)
-                        +'"  version="1.1" baseProfile="full"\n') #viewBox="0 0 500 350"
-                f.write('xmlns="http://www.w3.org/2000/svg"\n')
-                f.write('xmlns:xlink="http://www.w3.org/1999/xlink">\n')
-                for v in self._graph.vertices():
-                    f.write('  <defs>\n')
-                    f.write('<marker id="vertex'+rnd_str+str(v)+'" viewBox="0 0 {1} {1}" refX="{0}" refY="{0}"\n'.format(radius, 2*radius))
-                    f.write(' markerWidth="{0}" markerHeight="{0}">\n'.format(floor(radius/3)))
-                    f.write('  <circle cx="{0}" cy="{0}" r="{0}" fill="grey" />\n'.format(radius))
-                    f.write('<text x="{0:0.0f}" y="{1:0.0f}" font-size="{1}" '.format(float(radius), float(1.5*radius))
-                            +'text-anchor="middle" fill="white">'+str(v)+'</text>\n')
-                    f.write('</marker>\n')
-                    f.write('</defs>\n')
+        totalTime = str(totalTime)+'s'
+        shift_scale = self._shift_scale_fun(realizations,  rel_margin, width)
 
-                default_colors = ['LimeGreen','Orchid','Orange','Turquoise','SlateGray','LightGray']
-                colors = colors + default_colors
+        default_colors = ['LimeGreen','Orchid','Orange','Turquoise','SlateGray','LightGray']
+        colors = colors + default_colors
+        if edge_partition==True and self._same_lengths:
+            edge_partition = self._same_lengths
+        elif type(edge_partition)!=list or len(edge_partition)==0:
+                edge_partition = [self._graph.edges(labels=False)]
+                if len(colors) == len(default_colors):
+                    colors = ['LightGray']
 
-                if edge_partition:
-                    if type(edge_partition) == list:
-                        pass
-                    elif self._same_lengths:
-                        edge_partition = self._same_lengths
+        lines = []
+        lines.append('<svg width="'+str(width)+'" height="'+str(width)
+                +'"  version="1.1" baseProfile="full"\n') #viewBox="0 0 500 350"
+        lines.append('xmlns="http://www.w3.org/2000/svg"\n')
+        lines.append('xmlns:xlink="http://www.w3.org/1999/xlink">\n')
+        for v in self._graph.vertices():
+            lines.append('  <defs>\n')
+            lines.append('<marker id="vertex'+rnd_str+str(v)+'" viewBox="0 0 {1} {1}" refX="{0}" refY="{0}"\n'.format(radius, 2*radius))
+            lines.append(' markerWidth="{0}" markerHeight="{0}">\n'.format(floor(radius/3)))
+            lines.append('  <circle cx="{0}" cy="{0}" r="{0}" fill="grey" />\n'.format(radius))
+            lines.append('<text x="{0:0.0f}" y="{1:0.0f}" font-size="{1}" '.format(float(radius), float(1.5*radius))
+                    +'text-anchor="middle" fill="white">'+str(v)+'</text>\n')
+            lines.append('</marker>\n')
+            lines.append('</defs>\n')
+
+        i = 0
+        for edges_part in edge_partition:
+            for u,v in edges_part:
+                embd = realizations[first]
+                if i < len(colors):
+                    color = colors[i]
                 else:
-                    edge_partition = [self._graph.edges(labels=False)]
-                    if len(colors) == len(default_colors):
-                        colors = ['LightGray']
+                    color = 'black'
+                lines.append('<path fill="transparent" stroke="'+color+'" stroke-width="5px" id="edge'+rnd_str
+                        +str(u)+'-'+str(v)+'"'+
+                    ' d="M {:0.0f} {:0.0f} L {:0.0f} {:0.0f}" '.format(*(shift_scale(embd[u]) +
+                                                            shift_scale(embd[v])))
+                    +'marker-start="url(#vertex'+rnd_str+str(u)+')"   marker-end="url(#vertex'+rnd_str+str(v)+')" />\n')
+            i += 1
 
-                i = 0
-                for edges_part in edge_partition:
-                    for u,v in edges_part:
-                        embd = realizations[first]
-                        if i < len(colors):
-                            color = colors[i]
-                        else:
-                            color = 'black'
-                        f.write('<path fill="transparent" stroke="'+color+'" stroke-width="5px" id="edge'+rnd_str
-                                +str(u)+'-'+str(v)+'"'+
-                            ' d="M {:0.0f} {:0.0f} L {:0.0f} {:0.0f}" '.format(*(shift_scale(embd[u]) +
-                                                                    shift_scale(embd[v])))
-                            +'marker-start="url(#vertex'+rnd_str+str(u)+')"   marker-end="url(#vertex'+rnd_str+str(v)+')" />\n')
-                    i += 1
+        for edges_part in edge_partition:
+            for u,v in edges_part:
+                lines.append('<animate ')
+                lines.append('href="#edge'+rnd_str+str(u)+'-'+str(v)+'" ')
+                lines.append('attributeName="d" ')
+                lines.append('dur="'+totalTime+'" ')
+                lines.append('repeatCount="'+str(repetitions)+'" ')
+                lines.append('calcMode="linear" ')
+                path_str = ''
+                for embd in realizations[first:]+realizations[:first]: #+[realizations[first]]
+                    path_str = path_str+ 'M {:0.0f} {:0.0f} L {:0.0f} {:0.0f};'.format(*(shift_scale(embd[u]) +
+                                                            shift_scale(embd[v])))
+                lines.append('values="'+path_str+'"/>\n')
 
-                for edges_part in edge_partition:
-                    for u,v in edges_part:
-                        f.write('<animate ')
-                        f.write('href="#edge'+rnd_str+str(u)+'-'+str(v)+'" ')
-                        f.write('attributeName="d" ')
-                        f.write('dur="'+totalTime+'" ')
-                        f.write('repeatCount="'+str(repetitions)+'" ')
-                        f.write('calcMode="linear" ')
-                        path_str = ''
-                        for embd in realizations[first:]+realizations[:first]: #+[realizations[first]]
-                            path_str = path_str+ 'M {:0.0f} {:0.0f} L {:0.0f} {:0.0f};'.format(*(shift_scale(embd[u]) +
-                                                                    shift_scale(embd[v])))
-                        f.write('values="'+path_str+'"/>\n')
+        lines.append('</svg>\n')
 
-                f.write('</svg>\n')
-            if return_IPythonSVG:
-                from IPython.display import SVG
-                return SVG(fileName+'.svg')
-        else:
-            raise exceptions.RuntimeError('The motion is not parametric.')
+        if fileName!='':
+            with open(fileName+'.svg','w') as f:
+                f.writelines(lines)
+        if return_IPythonSVG:
+            from IPython.display import SVG
+            return SVG(''.join(lines))
+
 
     def height_function(self, vertex_edge_collisions, extra_layers=0, edge_edge_collisions=[]):
         def e2s(e):
@@ -583,6 +318,300 @@ class GraphMotion(SageObject):
             for e in vertex_coloring[layer]:
                 h[e] = layer
         return h
+
+
+class ParametricGraphMotion(GraphMotion):
+    r"""
+
+    """
+    def __init__(self, graph, input_format, active_NACs, data, check):
+        r"""
+
+
+        TODO:
+
+        Doc, examples
+        """
+        super(ParametricGraphMotion, self).__init__(graph)
+
+        self._parameter = None
+        self._par_type = 'symbolic'
+        self._field = None
+
+        if (type(data)!=dict or
+                not data.has_key('sampling_type')
+                or data['sampling_type']==None):
+            self._sampling_type = 'uniform'
+        else:
+            self._sampling_type = data['sampling_type']
+        if (type(data)!=dict or
+                not data.has_key('interval')
+                or type(data['interval'])!=list
+                or len(data['interval']) < 2):
+            if self._sampling_type == 'tan':
+                self._interval = [-pi/_sage_const_2, pi/_sage_const_2]
+            else:
+                self._interval = [-pi, pi]
+        else:
+            self._interval = [data['interval'][0], data['interval'][1]]
+        if input_format == "grid":
+            self._grid2motion(active_NACs[0], data,  check)
+        elif input_format == "parametrization":
+            self._parametrization2motion(active_NACs, data,  check)
+        elif input_format == 'spatial_embedding':
+            self._spatial_embedding2motion(active_NACs, data, check)
+        else:
+            raise exceptions.ValueError('The input format ' + str(input_format) + ' is not supported.')
+
+    def _repr_(self):
+        return 'Parametric motion with ' + self._par_type + ' parametrization: ' + str(self.parametrization())
+
+    def _grid2motion(self, NAC_coloring, zigzag, check):
+        self._par_type = 'symbolic'
+        alpha = var('alpha')
+        self._field = parent(alpha)
+        self._parameter = alpha
+        self._active_NACs = [NAC_coloring]
+        grid_coor = NAC_coloring.grid_coordinates()
+        self._same_lengths = []
+        for i, edges in enumerate([NAC_coloring.blue_edges(), NAC_coloring.red_edges()]):
+            partition = [[list(edges[0])]]
+            for u, v in edges[1:]:
+                appended = False
+                for part in partition:
+                    u2, v2 = part[0]
+                    if Set([grid_coor[u][i], grid_coor[v][i]]) == Set([grid_coor[u2][i], grid_coor[v2][i]]):
+                        part.append([u, v])
+                        appended = True
+                        break
+                if not appended:
+                    partition.append([[u, v]])
+            self._same_lengths += partition
+
+        if check and len(Set(grid_coor.values())) != self._graph.num_verts():
+            raise exceptions.ValueError('The NAC-coloring does not yield a proper flexible labeling.')
+        if zigzag:
+            if type(zigzag) == list and len(zigzag) == 2:
+                a = [vector(c) for c in zigzag[0]]
+                b = [vector(c) for c in zigzag[1]]
+            else:
+                m = max([k for _, k in grid_coor.values()])
+                n = max([k for k, _ in grid_coor.values()])
+                a = [vector([0.3*((-1)**i-1)+0.3*sin(i), i]) for i in range(0,m+1)]
+                b = [vector([j, 0.3*((-1)**j-1)+0.3*sin(j)]) for j in range(0,n+1)]
+        else:
+            positions = {}
+            m = max([k for _, k in grid_coor.values()])
+            n = max([k for k, _ in grid_coor.values()])
+            a = [vector([0, i]) for i in range(0,m+1)]
+            b = [vector([j, 0]) for j in range(0,n+1)]
+
+        rotation = matrix([[cos(alpha), sin(alpha)], [-sin(alpha), cos(alpha)]])
+        positions = {}
+        for v in self._graph.vertices():
+            positions[v] = rotation * a[grid_coor[v][1]] + b[grid_coor[v][0]]
+        self._parametrization = positions
+
+    def _parametrization2motion(self, active_NACs, data,  check):
+        self._parametrization = data['parametrization']
+        element = (sum([self._parametrization[v][0]**Integer(2) for v in self._parametrization])
+                    + sum([self._parametrization[v][1]**Integer(2) for v in self._parametrization]))
+        self._field = parent(element)
+        for v in self._parametrization:
+            self._parametrization[v] = vector([self._field(x) for x in self._parametrization[v]])
+        if data['par_type'] == 'symbolic':
+            self._par_type = 'symbolic'
+            if len(element.variables()) != 1:
+                raise exceptions.ValueError('The parametrization has to have one parameter (' + str(len(element.variables())) + ' found).')
+            self._parameter = element.variables()[0]
+        if data['par_type'] == 'rational':
+            self._par_type = 'rational'
+            self._parameter = self._field.gen()
+        if check:
+            self._edges_with_same_length()
+
+        self._active_NACs = active_NACs
+
+    def _spatial_embedding2motion(self, active_NACs, data,  check):
+        r"""
+        TODO:
+
+        Same lengths.
+        """
+        if data['deltoid_motion'] is None:
+            deltoid_motion = GraphMotion.Deltoid()
+        else:
+            deltoid_motion = data['deltoid_motion']
+        self._active_NACs = active_NACs
+        self._field = deltoid_motion._field
+        self._par_type = deltoid_motion._par_type
+        self._parameter = deltoid_motion._parameter
+        self._interval = deltoid_motion._interval
+        self._sampling_type = deltoid_motion._sampling_type
+        self._parametrization = {}
+        C = deltoid_motion.parametrization()
+        uvf = [C[i+1]-C[i] for i in range(0,3)]
+        embedding = self._graph.spatial_embeddings_four_directions(active_NACs[0], active_NACs[1], vertex_at_origin=data['vertex_at_origin'])
+        if embedding is None:
+            raise exceptions.RuntimeError('There is no injective spatial embeddings.')
+        vars = []
+        for v in embedding:
+            vars += list(embedding[v][0].variables())
+            vars += list(embedding[v][1].variables())
+        subs_dict = {}
+        for vrbl in Set(vars):
+            if data['subs_dict'].has_key(str(vrbl)):
+                subs_dict[vrbl] = data['subs_dict'][str(vrbl)]
+            else:
+                subs_dict[vrbl] = Integer(1)
+        for v in embedding:
+            if self._par_type == 'rational':
+                self._parametrization[v] = sum([self._field.constant_field()(xi.subs(subs_dict))*fi for xi,fi in zip(embedding[v],uvf)])
+            elif self._par_type == 'symbolic':
+                self._parametrization[v] = sum([xi.subs(subs_dict)*fi for xi,fi in zip(embedding[v],uvf)])
+
+        if check:
+            self._edges_with_same_length()
+
+
+    def _edges_with_same_length(self):
+        tmp = {}
+        for u, v in self._graph.edges(labels=False):
+            s = self._parametrization[u] - self._parametrization[v]
+            l = s.inner_product(s)
+            if self._par_type == 'rational' and not l in self._field.constant_field():
+                raise exceptions.ValueError('The edge ' + str((u, v)) + ' does not have constant length.')
+            if self._par_type == 'symbolic':
+                l = l.simplify_full()
+                if not l.simplify_full().is_constant():
+                    raise exceptions.ValueError('The edge ' + str((u, v)) + ' does not have constant length.')
+            if tmp.has_key(l):
+                tmp[l].append([u, v])
+            else:
+                tmp[l] = [[u, v]]
+        self._same_lengths = tmp.values()
+
+    def edge_lengths(self):
+        res = {}
+        for u, v in self._graph.edges(labels=False):
+            s = self._parametrization[u] - self._parametrization[v]
+            l = s.inner_product(s)
+            if self._par_type == 'rational':
+                if not l in self._field.constant_field():
+                    raise exceptions.ValueError('The edge ' + str((u, v)) + ' does not have constant length.')
+                l = self._field.constant_field()(l)
+            elif self._par_type == 'symbolic':
+                l = l.simplify_full()
+                if not l.simplify_full().is_constant():
+                    raise exceptions.ValueError('The edge ' + str((u, v)) + ' does not have constant length.')
+            res[(u, v)] = sqrt(l)
+        return res
+
+    def parametrization(self):
+        r"""
+        Return the parametrization.
+
+        TODO:
+
+        Doc, examples
+        """
+        return deepcopy(self._parametrization)
+
+
+    def realization(self, value,  numeric=False):
+        r"""
+        Return the realization for given value of the parameter.
+
+        TODO:
+
+        Doc, examples
+        """
+        res = {}
+        if self._par_type == 'symbolic':
+            subs_dict = { self._parameter : value}
+            for v in self._graph.vertices():
+                if numeric:
+                    res[v] = vector([RR(xi.subs(subs_dict)) for xi in self._parametrization[v]])
+                else:
+                    res[v] = vector([xi.subs(subs_dict) for xi in self._parametrization[v]])
+            return res
+        elif self._par_type == 'rational':
+            h = self._field.hom(value)
+            for v in self._graph.vertices():
+                if numeric:
+                    res[v] = vector([RR(h(xi)) for xi in self._parametrization[v]])
+                else:
+                    res[v] = vector([h(xi) for xi in self._parametrization[v]])
+            return res
+        else:
+            raise exceptions.NotImplementedError('')
+
+
+    def sample_parametrization(self, N):
+        r"""
+        Return a sampling of the motion.
+
+        TODO:
+
+        Doc, examples
+        """
+        a, b = self._interval
+        if self._sampling_type == 'uniform':
+            return [self.realization(RR(a + (i/Integer(N)) * (b-a)),  numeric=True) for i in range(0, N+1)]
+        elif self._sampling_type == 'tan':
+            return [self.realization(tan(RR(a + (i/Integer(N)) * (b-a))),  numeric=True) for i in range(0, N+1)]
+        else:
+            raise exceptions.NotImplementedError('Sampling ' + str(self._sampling_type) + ' is not supported.')
+
+
+    def fix_edge(self, fixed_edge, check=True):
+        u,v = fixed_edge
+        if check and not self._graph.has_edge(u, v):
+            raise exceptions.ValueError('The parameter ``fixed_edge`` must be an edge of the graph.')
+        res = {}
+        direction = self._parametrization[v] - self._parametrization[u]
+        l = sqrt(direction.inner_product(direction))
+        if self._par_type == 'symbolic':
+            l = l.simplify_full()
+        for w in self._parametrization:
+            tmp = self._parametrization[w] - self._parametrization[u]
+            if self._par_type == 'symbolic':
+                res[w] = vector([((tmp[0]*direction[0] + tmp[1]*direction[1])/l).simplify_full(),
+                            ((tmp[1]*direction[0] - tmp[0]*direction[1])/l).simplify_full()])
+            elif self._par_type == 'rational':
+                res[w] = vector([((tmp[0]*direction[0] + tmp[1]*direction[1])/l),
+                            ((tmp[1]*direction[0] - tmp[0]*direction[1])/l)])
+        self._parametrization = res
+
+
+    def animation_SVG(self, fileName='', edge_partition=True, first=None, totalTime=12, width=500,
+                           repetitions='indefinite', radius=15, return_IPythonSVG=True, fps=25,
+                           flipY=True,
+                           rel_margin=0.1, colors=[],
+                           rnd_str=True):
+        r"""
+        Save an SVG animation.
+
+        EXAMPLES::
+
+            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: G = GraphGenerator.ThreePrismGraph()
+            sage: delta = G.NAC_colorings()[0]
+            sage: M = GraphMotion.GridConstruction(G, delta.conjugated(), zigzag=[[[0,0], [0,1]], [[0,0], [3/4,1/2], [2,0]]])
+            sage: M.animation_SVG()
+            <IPython.core.display.SVG object>
+
+        TODO:
+
+        Doc, examples
+        """
+        realizations = self.sample_parametrization(totalTime*fps)
+        return super(ParametricGraphMotion, self).animation_SVG(realizations, fileName=fileName, edge_partition=edge_partition,
+                            first=first, totalTime=totalTime, width=width,
+                           repetitions=repetitions, radius=radius, return_IPythonSVG=return_IPythonSVG,
+                           flipY=flipY,
+                           rel_margin=rel_margin, colors=colors,
+                           rnd_str=rnd_str)
 
 
     def generate_POVray(self, filename, height_function, antialias=True, frames=200, width=1024, height=768, labels=False):
@@ -699,7 +728,26 @@ class GraphMotion(SageObject):
                         ','+ transform(self.parametrization()[v][1]) + '> }')
 
 
-
+    def _rich_repr_(self, display_manager, **kwds):
+        # copied from GenericGraph
+        prefs = display_manager.preferences
+        is_small = (0 < self._graph.num_verts() < 20)
+        can_plot = (prefs.supplemental_plot != 'never')
+        plot_graph = can_plot and (prefs.supplemental_plot == 'always' or is_small)
+        # Under certain circumstances we display the plot as graphics
+        if plot_graph:
+            from sage.repl.rich_output.output_graphics import OutputImageSvg
+            return OutputImageSvg(self.animation_SVG(edge_partition=False).data)
+        # create text for non-graphical output
+        if can_plot:
+            text = '{0} (use the .animation_SVG() method to show the animation)'.format(repr(self))
+        else:
+            text = repr(self)
+        # latex() produces huge tikz environment, override
+        tp = display_manager.types
+        if (prefs.text == 'latex' and tp.OutputLatex in display_manager.supported_output()):
+            return tp.OutputLatex(r'\text{{{0}}}'.format(text))
+        return tp.OutputPlainText(text)
 
 
 
@@ -709,4 +757,7 @@ class GraphMotion(SageObject):
 
 
 __doc__ = __doc__.replace(
-    "{INDEX_OF_METHODS}", (gen_rest_table_index(GraphMotion)))
+    "{INDEX_OF_METHODS_GRAPH_MOTION}", gen_rest_table_index(GraphMotion))
+
+__doc__ = __doc__.replace(
+    "{INDEX_OF_METHODS_PARAMETRIC_GRAPH_MOTION}", gen_rest_table_index(ParametricGraphMotion))
