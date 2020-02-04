@@ -2,7 +2,7 @@
 r"""
 This class implements a NAC-coloring of a graph.
 
-A coloring of edges $\\delta\\colon  E_G\\rightarrow \\{\\text{blue, red}\\}$ 
+A coloring of edges $\\delta\\colon  E_G\\rightarrow \\{\\text{blue, red}\\}$
 is called a *NAC-coloring*, if it is surjective and for every cycle $C$ in $G$,
 either all edges of $C$ have the same color, or
 $C$ contains at least 2 edges in each color [GLS2018]_.
@@ -17,8 +17,8 @@ AUTHORS:
 
 -  Jan Legerský (2019-01-15): initial version
 
-Class
--------
+NACcoloring
+-----------
 """
 
 #Copyright (C) 2018 Jan Legerský
@@ -36,10 +36,12 @@ Class
 #You should have received a copy of the GNU General Public License
 #along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from sage.all import Graph, Set
+from sage.all import Graph, Set#, show
 from sage.all import SageObject, latex, flatten
 from sage.misc.rest_index_of_methods import gen_rest_table_index
 from sage.misc.latex import latex_variable_name
+from sage.all import PermutationGroup
+from sage.all import copy
 
 import exceptions
 
@@ -47,14 +49,14 @@ class NACcoloring(SageObject):
     r"""
     The class for a NAC-coloring of a graph.
 
-    A coloring of edges $\\delta\\colon  E_G\\rightarrow \\{\\text{blue, red}\\}$ 
+    A coloring of edges $\\delta\\colon  E_G\\rightarrow \\{\\text{blue, red}\\}$
     is called a *NAC-coloring*, if it is surjective and for every cycle $C$ in $G$,
     either all edges of $C$ have the same color, or
     $C$ contains at least 2 edges in each color [GLS2018]_.
 
     INPUT:
 
-    - ``G`` -- a graph of type :meth:`RigidFlexibleGraph` 
+    - ``G`` -- a graph of type :class:`FlexRiGraph`
       to which the NAC-coloring belongs.
     - ``coloring`` -- a dictionary assigning to every edge of ``G`` either ``"red"`` or ``"blue"``,
       or a list consisting of two lists giving a partition of the edges of ``G``
@@ -64,10 +66,10 @@ class NACcoloring(SageObject):
 
     EXAMPLES::
 
-        sage: from rigid_and_flexible_graphs.NAC_coloring import NACcoloring
-        sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+        sage: from flexrilog import NACcoloring
+        sage: from flexrilog import GraphGenerator
         sage: G = GraphGenerator.SmallestFlexibleLamanGraph(); G
-        SmallestFlexibleLamanGraph: RigidFlexibleGraph with the vertices [0, 1, 2, 3, 4] and edges [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 4), (3, 4)]
+        SmallestFlexibleLamanGraph: FlexRiGraph with the vertices [0, 1, 2, 3, 4] and edges [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 4), (3, 4)]
         sage: delta = NACcoloring(G,[[(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)], [(2, 4), (3, 4)]]); delta
         NAC-coloring with red edges {{1, 3}, {1, 2}, {0, 2}, {0, 3}, {0, 1}} and blue edges {{2, 4}, {3, 4}}
 
@@ -93,22 +95,28 @@ class NACcoloring(SageObject):
         Traceback (most recent call last):
         ...
         RuntimeError: The edges of the NAC-coloring do not match the edges of the graph.
-
+    
+    TODO:
+    
+        blue/red graph
     """
     def __init__(self, G, coloring, name=None, check=True):
-        from .rigid_flexible_graph import RigidFlexibleGraph
-        if type(G) == RigidFlexibleGraph or 'RigidFlexibleGraph' in str(type(G)):
+        from flexible_rigid_graph import FlexRiGraph
+        if type(G) == FlexRiGraph or 'FlexRiGraph' in str(type(G)) or isinstance(G, FlexRiGraph):
             self._graph = G
         else:
-            raise exceptions.TypeError('The graph G must be RigidFlexibleGraph.')
+            raise exceptions.TypeError('The graph G must be FlexRiGraph.')
         if type(coloring) in [list, Set] and len(coloring) == 2:
             self._red_edges = Set([Set(e) for e in coloring[0]])
             self._blue_edges = Set([Set(e) for e in coloring[1]])
         elif type(coloring) == dict:
             self._red_edges = Set([Set(e) for e in coloring if coloring[e] == 'red'])
             self._blue_edges = Set([Set(e) for e in coloring if coloring[e] == 'blue'])
+        elif type(coloring)==NACcoloring or isinstance(coloring, NACcoloring) or 'NACcoloring' in str(type(coloring)):
+            self._red_edges = copy(coloring._red_edges)
+            self._blue_edges = copy(coloring._blue_edges)
         else:
-            raise exceptions.TypeError('The coloring must be a dict or list consisting of two lists.')
+            raise exceptions.TypeError('The coloring must be a dict, list consisting of two lists or an instance of NACcoloring.')
         self._check_edges()
         self._name = name
         if check and not self.is_NAC_coloring():
@@ -125,6 +133,11 @@ class NACcoloring(SageObject):
             res += str(len(self._blue_edges)) + ' blue edges '
         return res
 
+    def name(self):
+        r"""
+        Return the name of the NAC-coloring.
+        """
+        return self._name if self._name != None else ''
 
     def _rich_repr_(self, display_manager, **kwds):
         # copied from GenericGraph
@@ -134,9 +147,7 @@ class NACcoloring(SageObject):
         plot_graph = can_plot and (prefs.supplemental_plot == 'always' or is_small)
         # Under certain circumstances we display the plot as graphics
         if plot_graph:
-            plot_kwds = dict(kwds)
-            plot_kwds.setdefault('title', '$'+latex(self)+'$')
-            output = self._graph.plot(NAC_coloring=self,**plot_kwds)._rich_repr_(display_manager)
+            output = self.plot()._rich_repr_(display_manager)
             if output is not None:
                 return output
         # create text for non-graphical output
@@ -162,7 +173,7 @@ class NACcoloring(SageObject):
         r"""
         Raise a ``RuntimeError`` if the edges of the NAC-coloring do not match the edges of the graph.
         """
-        if (Set([Set(e) for e in self._graph.edges(labels=False)]) 
+        if (Set([Set(e) for e in self._graph.edges(labels=False)])
             != self._blue_edges.union(self._red_edges)):
             raise exceptions.RuntimeError('The edges of the NAC-coloring do not match the edges of the graph.')
 
@@ -174,10 +185,9 @@ class NACcoloring(SageObject):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.NAC_coloring import NACcoloring
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import NACcoloring, GraphGenerator
             sage: G = GraphGenerator.SmallestFlexibleLamanGraph(); G
-            SmallestFlexibleLamanGraph: RigidFlexibleGraph with the vertices [0, 1, 2, 3, 4] and edges [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 4), (3, 4)]
+            SmallestFlexibleLamanGraph: FlexRiGraph with the vertices [0, 1, 2, 3, 4] and edges [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 4), (3, 4)]
             sage: delta = NACcoloring(G,[[(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)], [(2, 4), (3, 4)]], check=False)
             sage: delta.is_NAC_coloring()
             True
@@ -199,10 +209,9 @@ class NACcoloring(SageObject):
 
         if len(self._red_edges) == 0 or len(self._blue_edges) == 0:
             return False
-        for edges in [self._red_edges, self._blue_edges]:
-            one_color_subgraph = Graph([list(e) for e in edges])
+        for one_color_subgraph in [self.red_subgraph(), self.blue_subgraph()]:
             for component in one_color_subgraph.connected_components():
-                if (len(Graph(self._graph).subgraph(component).edges(labels=False)) 
+                if (len(Graph(self._graph).subgraph(component).edges(labels=False))
                     - len(one_color_subgraph.subgraph(component).edges(labels=False))):
                     return False
         return True
@@ -212,6 +221,39 @@ class NACcoloring(SageObject):
         Return the list of blue edges of the NAC-coloring.
         """
         return list(self._blue_edges)
+
+    def color(self, u, v=None):
+        r"""
+        Return the color of an edge.
+
+        INPUT:
+
+        If ``v`` is ``None``, then ``u`` is consider to be an edge.
+        Otherwise, ``uv`` is taken as the edge.
+
+        EXAMPLES::
+
+            sage: from flexrilog import FlexRiGraph
+            sage: G = FlexRiGraph(graphs.CompleteBipartiteGraph(3,3))
+            sage: delta = G.NAC_colorings()[0]
+            sage: delta.color(0,3)
+            'red'
+            sage: delta.color([2,4])
+            'blue'
+            sage: delta.color(1,2)
+            Traceback (most recent call last):
+            ...
+            ValueError: There is no edge [1, 2]
+
+        """
+        if not v is None:
+            if not self._graph.has_edge(u,v):
+                raise exceptions.ValueError('There is no edge ' + str([u,v]))
+            return 'red' if Set([u,v]) in self._red_edges else 'blue'
+        else:
+            if not self._graph.has_edge(u[0],u[1]):
+                raise exceptions.ValueError('There is no edge ' + str([u[0],u[1]]))
+            return 'red' if Set([u[0],u[1]]) in self._red_edges else 'blue'
 
 
     def red_edges(self):
@@ -231,8 +273,8 @@ class NACcoloring(SageObject):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.rigid_flexible_graph import RigidFlexibleGraph
-            sage: G = RigidFlexibleGraph(graphs.CompleteBipartiteGraph(3,3))
+            sage: from flexrilog import FlexRiGraph
+            sage: G = FlexRiGraph(graphs.CompleteBipartiteGraph(3,3))
             sage: delta = G.NAC_colorings()[0]
             sage: delta.is_red(0,3)
             True
@@ -244,7 +286,7 @@ class NACcoloring(SageObject):
             ValueError: There is no edge [1, 2]
 
         """
-        if v:
+        if not v is None:
             if not self._graph.has_edge(u,v):
                 raise exceptions.ValueError('There is no edge ' + str([u,v]))
             return Set([u,v]) in self._red_edges
@@ -265,8 +307,8 @@ class NACcoloring(SageObject):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.rigid_flexible_graph import RigidFlexibleGraph
-            sage: G = RigidFlexibleGraph(graphs.CompleteBipartiteGraph(3,3))
+            sage: from flexrilog import FlexRiGraph
+            sage: G = FlexRiGraph(graphs.CompleteBipartiteGraph(3,3))
             sage: delta = G.NAC_colorings()[0]
             sage: delta.is_blue(2,4)
             True
@@ -288,27 +330,43 @@ class NACcoloring(SageObject):
             return Set([u[0],u[1]]) in self._blue_edges
 
 
+    def blue_subgraph(self):
+        return Graph([self._graph.vertices(),[list(e) for e in self._blue_edges]], format='vertices_and_edges')
+
+    
+    def blue_components(self):
+        return self.blue_subgraph().connected_components()
+
+
+    def red_subgraph(self):
+        return Graph([self._graph.vertices(),[list(e) for e in self._red_edges]], format='vertices_and_edges')
+
+
+    def red_components(self):
+        return self.red_subgraph().connected_components()
+    
+
     def plot(self, grid_pos=False, zigzag=False):
         r"""
         Return a plot of the NAC-coloring.
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.rigid_flexible_graph import RigidFlexibleGraph
-            sage: G = RigidFlexibleGraph(graphs.CompleteBipartiteGraph(3,3))
+            sage: from flexrilog import FlexRiGraph
+            sage: G = FlexRiGraph(graphs.CompleteBipartiteGraph(3,3))
             sage: delta = G.NAC_colorings()[0]
             sage: delta.plot()
             Graphics object consisting of 16 graphics primitives
 
         .. PLOT::
 
-            from rigid_and_flexible_graphs.rigid_flexible_graph import RigidFlexibleGraph
-            G = RigidFlexibleGraph(graphs.CompleteBipartiteGraph(3,3))
+            from flexrilog import FlexRiGraph
+            G = FlexRiGraph(graphs.CompleteBipartiteGraph(3,3))
             sphinx_plot(G.NAC_colorings()[0])
 
         ::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator
             sage: G = GraphGenerator.ThreePrismGraph()
             sage: delta = G.NAC_colorings()[0].conjugated()
             sage: delta.plot(grid_pos=True)
@@ -316,14 +374,14 @@ class NACcoloring(SageObject):
 
         .. PLOT::
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.ThreePrismGraph()
             delta = G.NAC_colorings()[0].conjugated()
             sphinx_plot(delta.plot(grid_pos=True))
 
         ::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator
             sage: G = GraphGenerator.ThreePrismGraph()
             sage: delta = G.NAC_colorings()[0].conjugated()
             sage: delta.plot(grid_pos=True, zigzag=True)
@@ -331,14 +389,14 @@ class NACcoloring(SageObject):
 
         .. PLOT::
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.ThreePrismGraph()
             delta = G.NAC_colorings()[0].conjugated()
             sphinx_plot(delta.plot(grid_pos=True, zigzag=True))
 
         ::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator
             sage: G = GraphGenerator.ThreePrismGraph()
             sage: delta = G.NAC_colorings()[0].conjugated()
             sage: delta.plot(grid_pos=True, zigzag=[[[0,0], [0,1]], [[0,0], [1,1/2], [2,0]]])
@@ -346,19 +404,21 @@ class NACcoloring(SageObject):
 
         .. PLOT::
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.ThreePrismGraph()
             delta = G.NAC_colorings()[0].conjugated()
             sphinx_plot(delta.plot(grid_pos=True, zigzag=[[[0,0], [0,1]], [[0,0], [1,1/2], [2,0]]]))
 
         TODO:
-        
+
         doc
         """
+        args_kwd = {}
+        if self.name():
+            args_kwd['title'] = '$'+latex_variable_name(self.name())+'$'
         if grid_pos:
-            from .graph_motion import GraphMotion
-            return self._graph.plot(NAC_coloring=self,
-                                    pos=GraphMotion.GridConstruction(self._graph, self, zigzag).realization(0, numeric=True))
+            from graph_motion import GraphMotion
+            args_kwd['pos'] = GraphMotion.GridConstruction(self._graph, self, zigzag).realization(0, numeric=True)
 #            grid_coor = self.grid_coordinates()
 #            if zigzag:
 #                if type(zigzag) == list and len(zigzag) == 2:
@@ -381,8 +441,7 @@ class NACcoloring(SageObject):
 #            for v in self._graph.vertices():
 #                positions[v] = rotation * a[grid_coor[v][1]] + b[grid_coor[v][0]]
 #            return self._graph.plot(NAC_coloring=self, pos=positions)
-        else:
-            return self._graph.plot(NAC_coloring=self)
+        return self._graph.plot(NAC_coloring=self, name_in_title=False, **args_kwd)
 
     def is_isomorphic(self, other_coloring, check=True, certificate=False, aut_group=None):
         r"""
@@ -390,7 +449,7 @@ class NACcoloring(SageObject):
 
         NAC-colorings $\\delta_1$ and $\\delta_2$ of a graph $G$ are isomorphic if and only if
         there exists and automorphism $\\sigma$ of $G$ such that
-        
+
         - $\\delta_1(uv) = \\text{red} \\iff \\delta_2(\\sigma(u),\\sigma(v)) = \\text{red}$ for all $uv\\in E_G$, or
         - $\\delta_1(uv) = \\text{blue} \\iff \\delta_2(\\sigma(u),\\sigma(v)) = \\text{red}$ for all $uv\\in E_G$.
 
@@ -405,9 +464,8 @@ class NACcoloring(SageObject):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.rigid_flexible_graph import RigidFlexibleGraph
-            sage: from rigid_and_flexible_graphs.NAC_coloring import NACcoloring
-            sage: G = RigidFlexibleGraph(graphs.CompleteBipartiteGraph(3,3))
+            sage: from flexrilog import FlexRiGraph, NACcoloring
+            sage: G = FlexRiGraph(graphs.CompleteBipartiteGraph(3,3))
             sage: colorings = G.NAC_colorings()
             sage: col1, col2, col3 = colorings[4], colorings[5], colorings[7]
             sage: col1
@@ -429,18 +487,16 @@ class NACcoloring(SageObject):
 
         .. PLOT::
 
-            from rigid_and_flexible_graphs.rigid_flexible_graph import RigidFlexibleGraph
-            from rigid_and_flexible_graphs.NAC_coloring import NACcoloring
-            G = RigidFlexibleGraph(graphs.CompleteBipartiteGraph(3,3))
+            from flexrilog import FlexRiGraph, NACcoloring
+            G = FlexRiGraph(graphs.CompleteBipartiteGraph(3,3))
             sphinx_plot(G.NAC_colorings()[4])
 
         ``col2``:
 
         .. PLOT::
 
-            from rigid_and_flexible_graphs.rigid_flexible_graph import RigidFlexibleGraph
-            from rigid_and_flexible_graphs.NAC_coloring import NACcoloring
-            G = RigidFlexibleGraph(graphs.CompleteBipartiteGraph(3,3))
+            from flexrilog import FlexRiGraph, NACcoloring
+            G = FlexRiGraph(graphs.CompleteBipartiteGraph(3,3))
             sphinx_plot(G.NAC_colorings()[5])
         """
         if check and self._graph != other_coloring._graph:
@@ -448,7 +504,7 @@ class NACcoloring(SageObject):
 
         if aut_group==None:
             aut_group = self._graph.automorphism_group()
-        if (Set([len(self.blue_edges()), len(self.red_edges())]) 
+        if (Set([len(self.blue_edges()), len(self.red_edges())])
             != Set([len(other_coloring.blue_edges()), len(other_coloring.red_edges())])):
             if not certificate:
                 return False
@@ -488,10 +544,9 @@ class NACcoloring(SageObject):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.NAC_coloring import NACcoloring
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import NACcoloring, GraphGenerator
             sage: G = GraphGenerator.SmallestFlexibleLamanGraph(); G
-            SmallestFlexibleLamanGraph: RigidFlexibleGraph with the vertices [0, 1, 2, 3, 4] and edges [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 4), (3, 4)]
+            SmallestFlexibleLamanGraph: FlexRiGraph with the vertices [0, 1, 2, 3, 4] and edges [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 4), (3, 4)]
             sage: delta1 = NACcoloring(G,[[(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)], [(2, 4), (3, 4)]])
             sage: delta2 = NACcoloring(G,[[(2, 4), (3, 4)],[(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)]])
             sage: delta1.is_equal(delta2)
@@ -511,7 +566,7 @@ class NACcoloring(SageObject):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator
             sage: G = GraphGenerator.SmallestFlexibleLamanGraph()
             sage: delta = G.NAC_colorings()[0]; delta
             NAC-coloring with red edges {{1, 3}, {1, 2}, {0, 2}, {0, 3}, {0, 1}} and blue edges {{2, 4}, {3, 4}}
@@ -532,21 +587,31 @@ class NACcoloring(SageObject):
         return edges.issubset(self._red_edges) or edges.issubset(self._blue_edges)
 
 
-    def grid_coordinates(self):
+    def grid_coordinates(self, ordered_red=[], ordered_blue=[]):
         r"""
         Return coordinates for the grid construction.
+        
+        The optional parameters `ordered_red`, `ordered_blue` can be used to specify the order of components to be taken.
 
         See [GLS2018]_ for the description of the grid construction.
+        
+        TODO:
+        
+        test
         """
-        red_subgraph = Graph(self.red_edges(), format='list_of_edges')
-        red_components = red_subgraph.connected_components()
-        red_components += [[v] for v in Set(self._graph.vertices()).difference(Set(flatten(red_components)))]
-        blue_subgraph = Graph(self.blue_edges(), format='list_of_edges')
-        blue_components = blue_subgraph.connected_components()
-        blue_components += [[v] for v in Set(self._graph.vertices()).difference(Set(flatten(blue_components)))]
         pos = {}
-        for (i,red) in enumerate(red_components):
-            for (j,blue) in enumerate(blue_components):
+        red_comps = self.red_components()
+        blue_comps = self.blue_components()
+        if ordered_red:
+            if type(ordered_red)!=list or len(ordered_red)!=len(red_comps) or Set(flatten(ordered_red))!=Set(self._graph.vertices()):
+                raise ValueError('`ordered_red` must be a list of all red components, not ' + str(ordered_red))
+            red_comps = ordered_red
+        if ordered_blue:
+            if type(ordered_blue)!=list or len(ordered_blue)!=len(blue_comps) or Set(flatten(ordered_blue))!=Set(self._graph.vertices()):
+                raise ValueError('`ordered_blue` must be a list of all blue components, not ' + str(ordered_blue))
+            blue_comps = ordered_blue
+        for (i,red) in enumerate(red_comps):
+            for (j,blue) in enumerate(blue_comps):
                 for v in blue:
                     if v in red:
                         pos[v] = (i,j)
@@ -558,7 +623,7 @@ class NACcoloring(SageObject):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator
             sage: G = GraphGenerator.ThreePrismGraph()
             sage: delta = G.NAC_colorings()[0]
             sage: delta.grid_coordinates_are_injective()
@@ -566,7 +631,7 @@ class NACcoloring(SageObject):
 
         ::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator
             sage: G = GraphGenerator.SmallestFlexibleLamanGraph()
             sage: delta = G.NAC_colorings()[0]
             sage: delta.grid_coordinates_are_injective()
@@ -581,8 +646,179 @@ class NACcoloring(SageObject):
         return NACcoloring(self._graph, [self.blue_edges(), self.red_edges()], check=False)
 
 
+    def is_singleton(self, NACs=[]):
+        r"""
+        Return if the NAC-coloring is a singleton.
+
+        Let $G$ be a graph and $N$ be a subset of its NAC-colorings.
+        A NAC-coloring $\\delta$ is called \\emph{singleton} w.r.t.\ $N$
+        if $|\\{(\\delta(e),\\delta'(e))\colon e\\in E_{Q_1}\\}|\\,\\neq 3$ for all $\\delta'\\in N$.
+
+        INPUT:
+
+        - ``NACs`` -- being singleton is considered w.r.t the list of NAC-colorings ``NACs``.
+          If this is empty (default), then all NAC-colorings of the graph are considered.
+
+        EXAMPLES::
+
+            sage: from flexrilog import GraphGenerator
+            sage: T = GraphGenerator.ThreePrismGraph()
+            sage: delta = T.NAC_colorings()[0]
+            sage: delta.is_singleton()
+            True
+
+        ::
+
+            sage: Q1 = GraphGenerator.Q1Graph()
+            sage: [[(delta.name(), delta.is_singleton()) for delta in equiv_cls] for equiv_cls in Q1.NAC_colorings_isomorphism_classes()]
+            [[('psi2', False), ('psi1', False)],
+             [('eta', True)],
+             [('gamma1', True), ('gamma2', True)],
+             [('phi4', False), ('phi3', False)],
+             [('epsilon24', True),
+              ('epsilon13', True),
+              ('epsilon23', True),
+              ('epsilon14', True)],
+             [('zeta', False)]]
+
+        ::
+
+            sage: delta = Q1.name2NAC_coloring('psi1')
+            sage: delta.is_singleton([Q1.name2NAC_coloring(name) for name in ['epsilon23', 'epsilon24', 'epsilon13', 'epsilon14']])
+            True
+        """
+        if NACs == []:
+            NACs = self._graph.NAC_colorings()
+        for delta in NACs:
+            if len(Set([(self.is_red(e), delta.is_red(e)) for e in self._graph.edges(labels=False)])) == 3:
+                return False
+        return True
+
+    def cycle_has_orthogonal_diagonals(self, cycle):
+        r"""
+        Return if the NAC-coloring implies orthogonal diagonals for a given 4-cycle.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: K33 = GraphGenerator.K33Graph()
+            sage: [[delta.name(), [cycle for cycle in K33.four_cycles() if delta.cycle_has_orthogonal_diagonals(cycle)]] for delta in K33.NAC_colorings()]
+            [['omega5', []],
+             ['omega3', []],
+             ['omega1', []],
+             ['omega6', []],
+             ['epsilon56', [(1, 2, 3, 4)]],
+             ['epsilon36', [(1, 2, 5, 4)]],
+             ['epsilon16', [(2, 3, 4, 5)]],
+             ['omega4', []],
+             ['epsilon45', [(1, 2, 3, 6)]],
+             ['epsilon34', [(1, 2, 5, 6)]],
+             ['epsilon14', [(2, 3, 6, 5)]],
+             ['omega2', []],
+             ['epsilon25', [(1, 4, 3, 6)]],
+             ['epsilon23', [(1, 4, 5, 6)]],
+             ['epsilon12', [(3, 4, 5, 6)]]]
+        """
+        if len(cycle)!= 4:
+            raise exceptions.ValueError('The cycle must be a 4-cycle.')
+        if self.path_is_unicolor(list(cycle) + [cycle[0]]):
+            if self.is_red(cycle[0], cycle[1]):
+                subgraph = Graph([self._graph.vertices(), [list(e) for e in self.blue_edges()]],  format='vertices_and_edges')
+            else:
+                subgraph = Graph([self._graph.vertices(), [list(e) for e in self.red_edges()]],  format='vertices_and_edges')
+            if subgraph.shortest_path(cycle[0], cycle[2]) and subgraph.shortest_path(cycle[1], cycle[3]):
+                return True
+            else:
+                return False
+        return False
+
+    def print_tikz(self):
+        r"""
+        Print TikZ code for the graph colored with the NAC-coloring.
+        """
+        self._graph.print_tikz([self.blue_edges(), self.red_edges()], ['redge', 'bedge'])
+        
+    def NAC2int(self):
+        r"""
+        Return the integer representation of the NAC-coloring.
+
+        The binary representation of the number is obtained by sorting
+        the edges lexicographically and setting 1 for red edges,
+        0 for blue edges, or the other way around if the first edge is blue.
+        
+        EXAMPLE::
+        
+            sage: from flexrilog import GraphGenerator
+            sage: delta = GraphGenerator.Q1Graph().NAC_colorings()[0]
+            sage: delta.NAC2int()
+            3871
+            sage: 3871.binary()
+            '111100011111'
+        """
+        s = '1'
+        u1, v1 = self._graph.edges(labels=False)[0]
+        first_color = self.color(u1, v1)
+        for u,v in self._graph.edges(labels=False):
+            s += '1' if self.color(u,v)==first_color else '0'
+        return int(s,2)
 
 
+
+
+class CnSymmetricNACcoloring(NACcoloring):
+    r"""
+    The class for a $\mathcal{C}_n$-symmetric NAC-coloring of a $\mathcal{C}_n$-symmetric graph.
+
+    We define a NAC-coloring $\delta$ to be a $\mathcal{C}_n$-symmetric if
+    
+    - $\delta(\omega e)$ = $\delta(e)$ for all $e \in E_G$, where $\omega$ generates $\mathcal{C}_n$, and 
+    - no two distinct blue, resp. red, partially invariant components are connected by an edge.
+    """
+    def __init__(self, G, coloring, name=None, check=True):
+        from flexible_rigid_graph import CnSymmetricFlexRiGraph
+        if not isinstance(G, CnSymmetricFlexRiGraph):
+            raise ValueError('The graph G must be an instance of CnSymmetricFlexRiGraph.')
+        super(CnSymmetricNACcoloring, self).__init__(G, coloring, name, check)
+        self.n = self._graph.n
+        self.omega = self._graph.omega
+        self._find_components_orbits()
+        if check and not self.is_Cn_symmetric():
+            raise exceptions.ValueError('The coloring is not a Cn-symmetric NAC-coloring.')
+        
+    
+    def _find_components_orbits(self):
+        red_subgraph = self.red_subgraph()
+        blue_subgraph = self.blue_subgraph()
+        self._partially_invariant_components = {}
+        self._noninvariant_components = {}
+        self._partially_invariant_orbits = {}
+        self._noninvariant_orbits = {}
+        for one_color_subgraph,  col in [[red_subgraph, 'red'],
+                                         [blue_subgraph, 'blue']]:
+            invariant_comps = []
+            noninv_comps = []
+            comps_as_sets = [Set(component) for component in one_color_subgraph.connected_components()]
+            comps_perm = PermutationGroup([[Set([self.omega(v) for v in component]) for component in comps_as_sets]],
+                                         domain=comps_as_sets)
+            for orbit in comps_perm.orbits():
+                if len(orbit)<self.n:
+                    invariant_comps.append(orbit)
+                else:
+                    noninv_comps.append(orbit)
+                    
+            self._partially_invariant_orbits[col] = invariant_comps
+            self._noninvariant_orbits[col] = noninv_comps
+            self._partially_invariant_components[col] = [list(comp) for orbit in invariant_comps for comp in orbit]
+            self._noninvariant_components[col] = [list(comp) for orbit in noninv_comps for comp in orbit]
+    
+    def is_Cn_symmetric(self):
+        if not self.is_equal(self.isomorphic_NAC_coloring(self.omega), moduloConjugation=False):
+            return False
+        if len(self.blue_subgraph().subgraph(flatten(self._partially_invariant_components['red'])).edges())>0:
+            return False
+        if len(self.red_subgraph().subgraph(flatten(self._partially_invariant_components['blue'])).edges())>0:
+            return False
+        return True
 
 
 

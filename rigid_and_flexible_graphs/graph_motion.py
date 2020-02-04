@@ -2,14 +2,14 @@
 r"""
 This is implementation of motions of a graph.
 
-Methods - GraphMotion
-----------------------
+Methods
+-------
 
+**GraphMotion**
 
 {INDEX_OF_METHODS_GRAPH_MOTION}
 
-Methods - ParametricGraphMotion
--------------------------------
+**ParametricGraphMotion**
 
 {INDEX_OF_METHODS_PARAMETRIC_GRAPH_MOTION}
 
@@ -17,7 +17,7 @@ AUTHORS:
 
 -  Jan Legerský (2019-01-24): initial version
 
-Class
+Classes
 -------
 """
 
@@ -36,23 +36,23 @@ Class
 #You should have received a copy of the GNU General Public License
 #along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from sage.all import deepcopy, Set, Graph#, ceil, sqrt, matrix, copy
+from sage.all import deepcopy, Set, Graph, find_root, ceil#, sqrt, matrix, copy
 from sage.all import SageObject,  parent, Subsets #, rainbow, latex, flatten
-from sage.all import vector, matrix, sin, cos, pi,  var,  RR,  floor,  tan
-from sage.all import FunctionField, QQ,  sqrt,  function
+from sage.all import vector, matrix, sin, cos, pi,  var,  RR,  floor,  tan, log
+from sage.all import FunctionField, QQ,  sqrt,  function, mod
 from sage.misc.rest_index_of_methods import gen_rest_table_index
 from sage.rings.integer import Integer
 _sage_const_3 = Integer(3); _sage_const_2 = Integer(2); _sage_const_1 = Integer(1);
 _sage_const_0 = Integer(0); _sage_const_6 = Integer(6); _sage_const_5 = Integer(5);
 _sage_const_4 = Integer(4); _sage_const_13 = Integer(13); _sage_const_12 = Integer(12)
 #from sage.rings.rational import Rational
-from rigid_flexible_graph import RigidFlexibleGraph
+from flexible_rigid_graph import FlexRiGraph
 import exceptions
 
 class GraphMotion(SageObject):
     def __init__(self, graph):
-        if not (isinstance(graph, RigidFlexibleGraph) or 'RigidFlexibleGraph' in str(type(graph))):
-            raise exceptions.TypeError('The graph must be of the type RigidFlexibleGraph.')
+        if not (isinstance(graph, FlexRiGraph) or 'FlexRiGraph' in str(type(graph))):
+            raise exceptions.TypeError('The graph must be of the type FlexRiGraph.')
         self._graph = graph
 
         self._same_lengths = None
@@ -62,11 +62,68 @@ class GraphMotion(SageObject):
         return 'An abstract motion of the graph ' + str(self._graph)
 
     @classmethod
-    def GridConstruction(cls, graph,  NAC_coloring,  zigzag=False,  check=True):
-        return ParametricGraphMotion(graph, 'grid',  [NAC_coloring],  zigzag, check)
+    def GridConstruction(cls, graph,  NAC_coloring,  zigzag=False,  check=True, red_components_ordered=[], blue_components_ordered=[]):
+        r"""
+        Return the motion obtained by grid construction for given NAC-coloring.
+        """
+        return ParametricGraphMotion(graph, 'grid',  [NAC_coloring],
+                                     {
+                                         'zigzag':zigzag,
+                                         'red':red_components_ordered,
+                                         'blue':blue_components_ordered
+                                     }, check)
+
+    
+    @classmethod
+    def CnSymmetricGridConstruction(cls, G, delta):
+        def Cn_symmetric_k_points(n,k, alpha=Integer(1) ):   
+            n = Integer(n)
+            k = Integer(k) 
+            if not mod(k,n) in [Integer(0) ,Integer(1) ]:
+                raise ValueError('Only possible if k mod n in {{0,1}}, here {} mod {} = {}.'.format(k,n,mod(k,n)))
+            res = {
+                    i : vector([RR(cos(RR(Integer(2) *pi*i)/n)),RR(sin(RR(Integer(2) *pi*i)/n))]) for i in range(Integer(0) ,n)
+                }
+            N = k
+            if mod(k,n)==Integer(1) :
+                res[N-Integer(1) ] = vector([Integer(0) ,Integer(0) ])
+                N = N-Integer(1) 
+            for i in range(n,N):
+                r = (i-i%n)/n +Integer(1) 
+                res[i] = r*res[i%n]
+            for i in res:
+                res[i] = alpha*vector([res[i][Integer(0) ], res[i][Integer(1) ]])
+            return [res[i] for i in sorted(res.keys())]
+    
+        n = delta.n
+        a = Cn_symmetric_k_points(n, len(delta._noninvariant_components['red']))
+        a += [vector([Integer(0) ,Integer(0) ]) for _ in range(len(delta._partially_invariant_components['red']))]
+        b = Cn_symmetric_k_points(n, len(delta._noninvariant_components['blue']))
+        b += [vector([Integer(0) ,Integer(0) ]) for _ in range(len(delta._partially_invariant_components['blue']))]
+        ab = [b, a]
+        M = GraphMotion.GridConstruction(G, delta,
+             check=False, zigzag=ab,
+             red_components_ordered=delta._noninvariant_components['red']+delta._partially_invariant_components['red'],
+             blue_components_ordered=delta._noninvariant_components['blue']+delta._partially_invariant_components['blue'])
+    
+        for comp in delta._partially_invariant_components['red']+delta._partially_invariant_components['blue']:
+            if len(comp)>Integer(1) :
+                M.fix_edge(Graph(G).subgraph(comp).edges(labels=False)[Integer(0) ])
+                break
+        return M
 
     @classmethod
-    def ParametrizedMotion(cls, graph, parametrization, par_type, active_NACs=None, sampling_type=None, interval=None, check=True):
+    def ParametricMotion(cls, graph, parametrization, par_type, active_NACs=None, sampling_type=None, interval=None, check=True):
+        r"""
+        Return parametric motion of a graph with a given parametrization.
+
+        INPUT:
+        
+        - ``graph`` -- an instance of FlexRiGraph
+        - ``parametrization`` -- a dictionary with a key being a vertex of the graph 
+          and its value being the position given as a vector.
+        - ``par_type`` -- type of the parametrization: ``rational`` or ``symbolic``
+        """
         return ParametricGraphMotion(graph, 'parametrization', active_NACs,
                                      { 'parametrization' : parametrization,
                                      'par_type' : par_type,
@@ -76,10 +133,7 @@ class GraphMotion(SageObject):
     @classmethod
     def Deltoid(cls, par_type='rational'):
         r"""
-
-        TODO:
-
-        Active NACs
+        Return a deltoid motion.
         """
         if par_type == 'rational':
             FF = FunctionField(QQ, 't')
@@ -93,8 +147,8 @@ class GraphMotion(SageObject):
                                          )/(t**_sage_const_4  + _sage_const_5 *t**_sage_const_2  + _sage_const_4 ),
                                          _sage_const_6 *(t**_sage_const_3  - _sage_const_2 *t)/(t**_sage_const_4  + _sage_const_5 *t**_sage_const_2  + _sage_const_4 )))
                 }
-            G = RigidFlexibleGraph([[0, 1], [1, 2], [2, 3], [0, 3]])
-            return GraphMotion.ParametrizedMotion(G, C, 'rational', sampling_type='tan', check=False)
+            G = FlexRiGraph([[0, 1], [1, 2], [2, 3], [0, 3]])
+            return GraphMotion.ParametricMotion(G, C, 'rational', sampling_type='tan', check=False)
         elif par_type == 'symbolic':
             t = var('t')
             C = {
@@ -106,15 +160,28 @@ class GraphMotion(SageObject):
                                          )/(t**_sage_const_4  + _sage_const_5 *t**_sage_const_2  + _sage_const_4 ),
                                          _sage_const_6 *(t**_sage_const_3  - _sage_const_2 *t)/(t**_sage_const_4  + _sage_const_5 *t**_sage_const_2  + _sage_const_4 )))
                 }
-            G = RigidFlexibleGraph([[0, 1], [1, 2], [2, 3], [0, 3]])
-            return ParametricGraphMotion.ParametrizedMotion(G, C, 'symbolic', sampling_type='tan', check=False)
+            G = FlexRiGraph([[0, 1], [1, 2], [2, 3], [0, 3]])
+            return ParametricGraphMotion.ParametricMotion(G, C, 'symbolic', sampling_type='tan', check=False)
         else:
             raise exceptions.ValueError('Deltoid with par_type ' + str(par_type) + ' is not supported.')
 
     @classmethod
-    def SpatialEmbeddingConstruction(cls, graph,  active_NACs, check=True, deltoid_motion=None, vertex_at_origin=None, subs_dict={}):
+    def SpatialEmbeddingConstruction(cls, graph,  active_NACs,
+                                     check=True, four_cycle_motion=None,
+                                     vertex_at_origin=None, subs_dict={}):
+        r"""
+        Return a motion given by spatial embedding construction.
+
+        INPUT:
+        
+        - ``graph`` -- an instance of FlexRiGraph
+        - ``active_NACs`` -- a pair of NAC-colorings used to construct a spatial embedding,
+          see :meth:`flexrilog.flexible_rigid_graph.FlexRiGraph.spatial_embeddings_four_directions`.
+        - ``four_cycle_motion`` -- a motion of a 4-cycle used to construct the motion of the whole graph.
+          If ``None`` (default), then :meth:`Deltoid` is used. 
+        """
         data = {
-                'deltoid_motion' : deltoid_motion,
+                'deltoid_motion' : four_cycle_motion,
                 'vertex_at_origin' : vertex_at_origin,
                 'subs_dict' : subs_dict
                 }
@@ -162,11 +229,11 @@ class GraphMotion(SageObject):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator, GraphMotion
             sage: G = GraphGenerator.ThreePrismGraph()
             sage: delta = G.NAC_colorings()[0]
             sage: M = GraphMotion.GridConstruction(G, delta.conjugated(), zigzag=[[[0,0], [0,1]], [[0,0], [3/4,1/2], [2,0]]])
-            sage: M.animation_SVG('animation')
+            sage: M.animation_SVG()
             <IPython.core.display.SVG object>
 
         TODO:
@@ -257,6 +324,13 @@ class GraphMotion(SageObject):
 
 
     def height_function(self, vertex_edge_collisions, extra_layers=0, edge_edge_collisions=[]):
+        r"""
+        Return a height function of edges if possible for given vertex-edge collisions.
+
+        WARNING:
+        
+        Costly, since it runs through all edge-colorings.
+        """
         def e2s(e):
             return Set(e)
         for v in vertex_edge_collisions:
@@ -273,10 +347,11 @@ class GraphMotion(SageObject):
             collision_graph.add_edge([e2s(f), e2s(e), 'e-e_col'])
         from sage.graphs.graph_coloring import all_graph_colorings
         optimal = False
+        chrom_number = collision_graph.chromatic_number()
         for j in range(0, extra_layers + 1):
             i = 1
             res = []
-            num_layers = collision_graph.chromatic_number() + j
+            num_layers = chrom_number + j
             min_s = len(self._graph.vertices())*num_layers
             for col in all_graph_colorings(collision_graph,num_layers):
                 if len(Set(col.keys()))<num_layers:
@@ -312,6 +387,8 @@ class GraphMotion(SageObject):
                             break
             if optimal:
                 break
+        if not res:
+            return None
         vertex_coloring = min(res, key = lambda t: t[1])[0]
         h = {}
         for layer in  vertex_coloring:
@@ -366,13 +443,14 @@ class ParametricGraphMotion(GraphMotion):
     def _repr_(self):
         return 'Parametric motion with ' + self._par_type + ' parametrization: ' + str(self.parametrization())
 
-    def _grid2motion(self, NAC_coloring, zigzag, check):
+    def _grid2motion(self, NAC_coloring, data, check):
         self._par_type = 'symbolic'
         alpha = var('alpha')
         self._field = parent(alpha)
         self._parameter = alpha
         self._active_NACs = [NAC_coloring]
-        grid_coor = NAC_coloring.grid_coordinates()
+        zigzag = data['zigzag']
+        grid_coor = NAC_coloring.grid_coordinates(ordered_red=data['red'], ordered_blue=data['blue'])
         self._same_lengths = []
         for i, edges in enumerate([NAC_coloring.blue_edges(), NAC_coloring.red_edges()]):
             partition = [[list(edges[0])]]
@@ -400,7 +478,6 @@ class ParametricGraphMotion(GraphMotion):
                 a = [vector([0.3*((-1)**i-1)+0.3*sin(i), i]) for i in range(0,m+1)]
                 b = [vector([j, 0.3*((-1)**j-1)+0.3*sin(j)]) for j in range(0,n+1)]
         else:
-            positions = {}
             m = max([k for _, k in grid_coor.values()])
             n = max([k for k, _ in grid_coor.values()])
             a = [vector([0, i]) for i in range(0,m+1)]
@@ -454,12 +531,12 @@ class ParametricGraphMotion(GraphMotion):
         embedding = self._graph.spatial_embeddings_four_directions(active_NACs[0], active_NACs[1], vertex_at_origin=data['vertex_at_origin'])
         if embedding is None:
             raise exceptions.RuntimeError('There is no injective spatial embeddings.')
-        vars = []
+        vrs = []
         for v in embedding:
-            vars += list(embedding[v][0].variables())
-            vars += list(embedding[v][1].variables())
+            vrs += list(embedding[v][0].variables())
+            vrs += list(embedding[v][1].variables())
         subs_dict = {}
-        for vrbl in Set(vars):
+        for vrbl in Set(vrs):
             if data['subs_dict'].has_key(str(vrbl)):
                 subs_dict[vrbl] = data['subs_dict'][str(vrbl)]
             else:
@@ -492,6 +569,9 @@ class ParametricGraphMotion(GraphMotion):
         self._same_lengths = tmp.values()
 
     def edge_lengths(self):
+        r"""
+        Return the dictionary of edge lengths.
+        """
         res = {}
         for u, v in self._graph.edges(labels=False):
             s = self._parametrization[u] - self._parametrization[v]
@@ -547,7 +627,7 @@ class ParametricGraphMotion(GraphMotion):
             raise exceptions.NotImplementedError('')
 
 
-    def sample_parametrization(self, N):
+    def sample_motion(self, N, numeric=True, start_margin=0, end_margin=0):
         r"""
         Return a sampling of the motion.
 
@@ -556,18 +636,33 @@ class ParametricGraphMotion(GraphMotion):
         Doc, examples
         """
         a, b = self._interval
-        if self._sampling_type == 'uniform':
-            return [self.realization(RR(a + (i/Integer(N)) * (b-a)),  numeric=True) for i in range(0, N+1)]
-        elif self._sampling_type == 'tan':
-            return [self.realization(tan(RR(a + (i/Integer(N)) * (b-a))),  numeric=True) for i in range(0, N+1)]
+        if numeric:
+            if self._sampling_type == 'uniform':
+                return [self.realization(RR(a + (i/Integer(N)) * (b-a)),  numeric=True) 
+                        for i in range(start_margin, N+1-end_margin)]
+            elif self._sampling_type == 'tan':
+                return [self.realization(tan(RR(a + (i/Integer(N)) * (b-a))),  numeric=True) 
+                        for i in range(start_margin, N+1-end_margin)]
+            else:
+                raise exceptions.NotImplementedError('Sampling ' + str(self._sampling_type) + ' is not supported.')
         else:
-            raise exceptions.NotImplementedError('Sampling ' + str(self._sampling_type) + ' is not supported.')
+            if self._sampling_type == 'uniform':
+                return [self.realization(a + (i/Integer(N)) * (b-a)) 
+                        for i in range(start_margin, N+1-end_margin)]
+            elif self._sampling_type == 'tan':
+                return [self.realization(tan(a + (i/Integer(N)) * (b-a))) 
+                        for i in range(start_margin, N+1-end_margin)]
+            else:
+                raise exceptions.NotImplementedError('Sampling ' + str(self._sampling_type) + ' is not supported.')
 
 
-    def fix_edge(self, fixed_edge, check=True):
-        u,v = fixed_edge
+    def fix_edge(self, edge, check=True):
+        r"""
+        Change the fixed edge in the motion.
+        """
+        u,v = edge
         if check and not self._graph.has_edge(u, v):
-            raise exceptions.ValueError('The parameter ``fixed_edge`` must be an edge of the graph.')
+            raise exceptions.ValueError('The parameter ``edge`` must be an edge of the graph.')
         res = {}
         direction = self._parametrization[v] - self._parametrization[u]
         l = sqrt(direction.inner_product(direction))
@@ -594,7 +689,7 @@ class ParametricGraphMotion(GraphMotion):
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator, GraphMotion
             sage: G = GraphGenerator.ThreePrismGraph()
             sage: delta = G.NAC_colorings()[0]
             sage: M = GraphMotion.GridConstruction(G, delta.conjugated(), zigzag=[[[0,0], [0,1]], [[0,0], [3/4,1/2], [2,0]]])
@@ -605,7 +700,7 @@ class ParametricGraphMotion(GraphMotion):
 
         Doc, examples
         """
-        realizations = self.sample_parametrization(totalTime*fps)
+        realizations = self.sample_motion(totalTime*fps)
         return super(ParametricGraphMotion, self).animation_SVG(realizations, fileName=fileName, edge_partition=edge_partition,
                             first=first, totalTime=totalTime, width=width,
                            repetitions=repetitions, radius=radius, return_IPythonSVG=return_IPythonSVG,
@@ -614,12 +709,20 @@ class ParametricGraphMotion(GraphMotion):
                            rnd_str=rnd_str)
 
 
-    def generate_POVray(self, filename, height_function, antialias=True, frames=200, width=1024, height=768, labels=False):
+    def generate_POVray(self, filename, height_function, antialias=True, frames=200, width=1024, height=768, labels=False,
+                        camera_location=[3.0 , 3.0 , 3.0], look_at=[0.0 , 0.3 , 0.0],
+                        compile_animation=False):
+        r"""
+        Generate files for POV-ray animation.
+
+        TODO:
+
+        description, make radius as parameter
+        """
         A = {}
         for v in self._graph.vertices():
-            A_min_v = min([height_function[e] for e in height_function if v in e])
-            A_max_v = max([height_function[e] for e in height_function if v in e])
-            A[v] = [A_min_v, A_max_v]
+            values = [height_function[e] for e in height_function if v in e]
+            A[v] = [min(values), max(values)]
         def transform_rec(expr):
             op = expr.operator()
             operands = expr.operands()
@@ -636,6 +739,9 @@ class ParametricGraphMotion(GraphMotion):
         def transform(expr):
             if self._par_type == 'symbolic':
                 return str(transform_rec(expr).subs([self._parameter==var('T')]))
+            elif self._par_type == 'rational':
+                h = self._field.hom(var('T'))
+                return str(transform_rec(h(expr)))
         radius = Integer(1)/Integer(20)
         r_joint = radius
         layer_height = Integer(25)/Integer(100)
@@ -649,7 +755,7 @@ class ParametricGraphMotion(GraphMotion):
             'Antialias_Depth=6',
             '',
             'Input_File_Name="' + filename +'.pov"',
-            'Output_File_Name="img_' + filename +'/"',
+            'Output_File_Name="' + filename +'_img/"',
             '',
             'Initial_Frame=1',
             'Final_Frame='+str(frames),
@@ -663,6 +769,12 @@ class ParametricGraphMotion(GraphMotion):
             'Pause_when_Done=off']))
 
         with open(filename+'.pov','w') as f:
+            if self._sampling_type == 'uniform':
+                samp = '('
+            elif self._sampling_type == 'tan':
+                samp = 'tan('
+            else:
+                raise exceptions.NotImplementedError('Type '+str(self._sampling_type) + 'not implemented.')
             f.writelines('\n'.join(['#version 3.7;',
                 '#include "math.inc"',
                 ' ',
@@ -670,8 +782,8 @@ class ParametricGraphMotion(GraphMotion):
                 'camera{ //ultra_wide_angle',
                 '        angle 40',
                 '        right z*image_width/image_height',
-                '        location  <3.0 , 3.0 , 3.0>',
-                '        look_at   <0.0 , 0.3 , 0.0> }',
+                '        location  <{}, {}, {}>'.format(*camera_location),
+                '        look_at   <{}, {}, {}>'.format(*look_at) +'}',
                 'light_source{ <1500,2500,2500>',
                 '              color rgb<1,1,1> }',
                 'sky_sphere{ pigment{color rgb<1,1,1>}}',
@@ -680,8 +792,12 @@ class ParametricGraphMotion(GraphMotion):
                 '#declare Black = rgb <0,0,0>;',
                 '#declare LightGray = White*0.8;',
                 '#declare DarkGray = White*0.2;',
-                '#declare T = clock*2*3.1415 ;']))
-            f.write('\n//' +str(self.parametrization()))
+                ('#declare T = ' + samp
+                    + str(RR(self._interval[0]))
+                    + ' + clock*' + str(RR(self._interval[1]-self._interval[0]))
+                    + ');')
+                ]))
+            f.write('\n// parametrization: ' +str(self.parametrization()))
             for e in self._graph.edges(labels=False):
                 f.write('\n// ' + str(e))
                 f.write('\ncylinder{')
@@ -726,6 +842,15 @@ class ParametricGraphMotion(GraphMotion):
                     f.write('\nscale 0.4')
                     f.write('translate <' + transform(self.parametrization()[v][0]) + ',' + str(layer_height *(A[v][1]+Integer(1)/Integer(2))) +
                         ','+ transform(self.parametrization()[v][1]) + '> }')
+        if compile_animation:
+            name = filename
+            import subprocess
+            print(subprocess.call(['mkdir', name + '_img']))
+            print(subprocess.call(['povray', name+'.ini']))
+            print(subprocess.call(['ffmpeg', '-y', '-framerate', '24', '-i',
+                             name+'_img/'+name+'%0' + str(len(str(frames))) +'d.png', '-vb', '2M', name+'.mp4']))
+            from IPython.display import HTML
+            return HTML('<video width="100%" controls> <source src="'+name+'.mp4" type="video/mp4"></video>')
 
 
     def _rich_repr_(self, display_manager, **kwds):
@@ -750,8 +875,126 @@ class ParametricGraphMotion(GraphMotion):
         return tp.OutputPlainText(text)
 
 
+    def collisions(self):
+        r"""
+        Return vertex-edge collisions.
+
+        OUTPUT:
+
+        A dictionary where key ``v`` is a vertex and the corresponding value
+        is a list of edges ``e`` such that ``v`` collides with ``e`` for some parameter value.
+
+        EXAMPLES::
+
+            sage: from flexrilog import GraphMotion
+            sage: GraphMotion.Deltoid().collisions()
+            {0: [(1, 2), (2, 3)], 1: [(0, 3), (2, 3)], 3: [(0, 1), (1, 2)]}
+
+        ::
+
+            sage: from flexrilog import FlexRiGraph
+            sage: t = var('t')
+            sage: edges = [(1, 4), (1, 5), (1, 6), (2, 4), (2, 5), (2, 6), (3, 5), (3, 6), (3, 4)]
+            sage: M = GraphMotion.ParametricMotion(FlexRiGraph(edges),
+            ....:     {1: vector([sin(t),0]), 2: vector([sqrt(1+sin(t)^2),0]), 3: vector([-sqrt(2+sin(t)^2),0]),
+            ....:     4: vector([0,cos(t)]), 5: vector([0,sqrt(1+cos(t)*cos(t))]), 6: vector([0,-sqrt(2+cos(t)^2)])},
+            ....:     'symbolic')
+            sage: M.collisions()
+            {1: [(3, 4), (2, 4)], 4: [(1, 5), (1, 6)]}
 
 
+        WARNING:
+
+        It is not guaranteed that all collisions are found,
+        since it depends on numerical root finding of complicated expressions.
+        """
+        def find_all_roots(eq, a, b):
+            r = find_root(eq, a, b)
+            res = [r]
+            margin = 0.01
+            r_l = r - margin
+            r_r = r + margin
+            try:
+                if a<r_l:
+                    res += find_all_roots(eq, a, r_l)
+            except RuntimeError:
+                pass
+            try:
+                if r_r<b:
+                    res += find_all_roots(eq, r_r, b)
+            except RuntimeError:
+                pass
+            return res
+        res = {}
+        for u in self._graph:
+            res[u] = []
+            for v,w in self._graph.edges(labels=False):
+                if u in [v, w]:
+                    continue
+                z = self._parametrization[u] - self._parametrization[v]
+                a = z.inner_product(z)
+                z = self._parametrization[u] - self._parametrization[w]
+                b = z.inner_product(z)
+                z = self._parametrization[w] - self._parametrization[v]
+                c = z.inner_product(z)
+                if self._par_type == 'symbolic':
+                    eq = sqrt(a) + sqrt(b) - sqrt(c)
+                elif self._par_type == 'rational':
+                    h = self._field.hom(var('T'))
+                    eq = sqrt(h(a)) + sqrt(h(b)) - sqrt(h(c))
+                try:
+                    r = find_root(eq, self._interval[0], self._interval[1])
+                    res[u].append((v,w))
+                except RuntimeError:
+                    pass
+        for u in self._graph:
+            for v,w in self._graph.edges(labels=False):
+                if u in [v, w]:
+                    continue
+                x = self._parametrization[w] - self._parametrization[u]
+                y = self._parametrization[v] - self._parametrization[u]
+                eq = x[0]*y[1] - y[0]*x[1]
+                if self._par_type == 'rational':
+                    h = self._field.hom(var('T'))
+                    eq = h(eq)
+                try:
+                    for r in find_all_roots(eq, self._interval[0], self._interval[1]):
+                        if self._par_type == 'symbolic':
+                            if x[0].subs({self._parameter:RR(r)})!=0:
+                                ratio = y[0]/x[0]
+                            elif x[1].subs({self._parameter:RR(r)})!=0:
+                                ratio = y[1]/x[1]
+                            else:
+                                res[u].append((v,w))
+                                continue
+                            if (ratio).subs({self._parameter:RR(r)}) <= 0:
+                                res[u].append((v,w))
+                        elif self._par_type == 'rational':
+                            if h(x[0])!=0:
+                                ratio = y[0]/x[0]
+                            elif h(x[1])!=0:
+                                ratio = y[1]/x[1]
+                            else:
+                                res[u].append((v,w))
+                                continue
+                            h = self._field.hom(RR(r))
+                            if h(ratio) <= 0:
+                                res[u].append((v,w))
+                        else:
+                            raise NotImplementedError()
+                except RuntimeError:
+                    pass
+        return {v: Set(res[v]).list() for v in res if res[v]}
+
+
+    def merge_animations(self, motions, total_time=12, fps=25, **kwargs):
+        r"""
+        Return an animation by concatenating a list of motions.
+        """
+        realizations = []
+        for M in motions:
+            realizations += M.sample_motion(floor(total_time*fps/len(motions)))
+        return super(ParametricGraphMotion, self).animation_SVG(realizations, **kwargs)
 
 
 

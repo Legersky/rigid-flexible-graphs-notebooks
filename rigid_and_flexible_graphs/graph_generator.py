@@ -13,6 +13,11 @@ Graphs
 AUTHORS:
 
 -  Jan Legerský (2019-01-15): initial version
+
+TODO:
+
+- L2, ..., L6
+- lists of L_i, Q_i, S_i graphs
 """
 
 #Copyright (C) 2018 Jan Legerský
@@ -30,9 +35,11 @@ AUTHORS:
 #You should have received a copy of the GNU General Public License
 
 from sage.rings.integer import Integer
-from rigid_flexible_graph import RigidFlexibleGraph
+from flexible_rigid_graph import FlexRiGraph
 import exceptions
 from sage.misc.rest_index_of_methods import gen_rest_table_index
+from sage.all import flatten, Set,  Graph
+
 
 class GraphGenerator():
 
@@ -43,18 +50,18 @@ class GraphGenerator():
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
-            sage: RigidFlexibleGraph([(0, 3), (0, 4), (0, 5), (1, 2), (1, 4), (1, 5), (2, 3), (2, 5), (3, 4)]) == GraphGenerator.ThreePrismGraph()
+            sage: from flexrilog import GraphGenerator, FlexRiGraph
+            sage: FlexRiGraph([(0, 3), (0, 4), (0, 5), (1, 2), (1, 4), (1, 5), (2, 3), (2, 5), (3, 4)]) == GraphGenerator.ThreePrismGraph()
             True
 
         .. PLOT::
             :scale: 70
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.ThreePrismGraph()
             sphinx_plot(G)
         """
-        G = RigidFlexibleGraph(Integer(7916), name='3-prism',
+        G = FlexRiGraph(Integer(7916), name='3-prism',
                            pos={4: [0.6, 0.4], 5: [0, 1.4], 2: [1, 1.4],
                                 3: [1, 0], 0: [0, 0], 1: [0.6, 1]})
         G._swap_xy()
@@ -68,30 +75,95 @@ class GraphGenerator():
         return GraphGenerator.ThreePrismGraph()
 
     @staticmethod
+    def K33Graph():
+        r"""
+        Return the graph $K_{3,3}$.
+
+        EXAMPLES::
+
+            sage: from flexrilog import GraphGenerator, FlexRiGraph
+            sage: FlexRiGraph(graphs.CompleteBipartiteGraph(3,3)).is_isomorphic(GraphGenerator.K33Graph())
+            True
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.K33Graph()
+            sphinx_plot(G)
+        """
+        K33 = FlexRiGraph([(1, 2) , (1, 4) , (1, 6) , (3, 2) , (3, 4) , (3, 6) , (5, 2) , (5, 4) , (5, 6)], name='K33',
+                           pos={4 : (0.500, 0.866), 5 : (-0.500, 0.866), 6 : (-1.00, 0.000), 3 : (1.00, 0.000),
+                                       2 : (0.500, -0.866), 1 : (-0.500, -0.866)})
+        for delta in K33.NAC_colorings():
+            for edges in [delta.red_edges(), delta.blue_edges()]:
+                if len(edges)==3:
+                    delta.set_name('omega' + str(edges[0].intersection(edges[1]).intersection(edges[2])[0]))
+                elif len(edges)==5:
+                    for e in edges:
+                        if not e.intersection(Set(flatten([list(e2) for e2 in edges if e2!=e]))):
+                            delta.set_name('epsilon' + str(e[0]) + str(e[1]))
+        return K33
+
+    @staticmethod
+    def K23Graph():
+        r"""
+        Return the graph $K_{2,3}$.
+
+        EXAMPLES::
+
+            sage: from flexrilog import GraphGenerator, FlexRiGraph
+            sage: FlexRiGraph(graphs.CompleteBipartiteGraph(2,3)).is_isomorphic(GraphGenerator.K23Graph())
+            True
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.K23Graph()
+            sphinx_plot(G)
+        """
+        K23 = FlexRiGraph([(1, 2) , (1, 4) , (3, 2) , (3, 4) , (5, 2) , (5, 4)], name='K23',
+                           pos={4 : (0, 1), 5 : (1, 0), 3 : (0.00, 0.000),
+                                       2 : (0, -1), 1 : (-1, 0)})
+        for delta in K23.NAC_colorings():
+            for edges in [delta.red_edges(), delta.blue_edges()]:
+                if len(edges)==2:
+                    delta.set_name('alpha' + str(edges[0].intersection(edges[1])[0]))
+                elif len(edges)==3:
+                    if Set(edges[0]).intersection(Set(edges[1])).intersection(Set(edges[2])):
+                        delta.set_name('gamma')
+                    else:
+                        for e in edges:
+                            if not e.intersection(Set(flatten([list(e2) for e2 in edges if e2!=e]))):
+                                delta.set_name('beta' + str(e[0]) + str(e[1]))
+        return K23
+
+    @staticmethod
     def SmallestFlexibleLamanGraph():
         r"""
         Return the smallest Laman graph that has a flexible labeling.
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
-            sage: RigidFlexibleGraph([[0,1],[1,2],[0,2],[0,3],[1,3],[2,4],[3,4]]) == GraphGenerator.SmallestFlexibleLamanGraph()
+            sage: from flexrilog import GraphGenerator, FlexRiGraph
+            sage: FlexRiGraph([[0,1],[1,2],[0,2],[0,3],[1,3],[2,4],[3,4]]) == GraphGenerator.SmallestFlexibleLamanGraph()
             True
 
         .. PLOT::
             :scale: 70
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.SmallestFlexibleLamanGraph()
             sphinx_plot(G)
         """
-        G = RigidFlexibleGraph([[0,1],[1,2],[0,2],[0,3],[1,3],[2,4],[3,4]], name='SmallestFlexibleLamanGraph',
+        G = FlexRiGraph([[0,1],[1,2],[0,2],[0,3],[1,3],[2,4],[3,4]], name='SmallestFlexibleLamanGraph',
                            pos={0: [0, 0], 1: [2, 0], 2: [1, 1],
                                 3: [1, -1], 4: [3, 0]})
         return G
 
     @staticmethod
-    def MaxEmbeddingsLamanGraph(n):
+    def MaxEmbeddingsLamanGraph(n, labeled_from_one=True):
         r"""
         Return the Laman graph with ``n`` vertices with the maximum number of complex embeddings.
 
@@ -103,8 +175,8 @@ class GraphGenerator():
 
         EXAMPLES::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
-            sage: GraphGenerator.MaxEmbeddingsLamanGraph(6) == GraphGenerator.ThreePrismGraph()
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.MaxEmbeddingsLamanGraph(6).is_isomorphic(GraphGenerator.ThreePrismGraph())
             True
 
         The graphs:
@@ -112,14 +184,14 @@ class GraphGenerator():
         .. PLOT::
             :width: 70%
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.MaxEmbeddingsLamanGraph(6)
             sphinx_plot(G)
 
         .. PLOT::
             :width: 70%
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.MaxEmbeddingsLamanGraph(7)
             sphinx_plot(G)
 
@@ -127,35 +199,35 @@ class GraphGenerator():
         .. PLOT::
             :width: 70%
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.MaxEmbeddingsLamanGraph(8)
             sphinx_plot(G)
 
         .. PLOT::
             :width: 70%
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.MaxEmbeddingsLamanGraph(9)
             sphinx_plot(G)
 
         .. PLOT::
             :width: 70%
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.MaxEmbeddingsLamanGraph(10)
             sphinx_plot(G)
 
         .. PLOT::
             :width: 70%
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.MaxEmbeddingsLamanGraph(11)
             sphinx_plot(G)
 
         .. PLOT::
             :width: 70%
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.MaxEmbeddingsLamanGraph(12)
             sphinx_plot(G)
         """
@@ -181,35 +253,254 @@ class GraphGenerator():
             12: {11 : (20.00,-12.00), 6 : (-20.00,-12.00), 10 : (7.80,6.20), 7 : (-8.30,-3.90), 9 : (8.30,-3.90), 8 : (-7.80,6.20),
                  0 : (15.00,0.85), 1 : (20.00,14.00), 2 : (0.00,-2.10), 3 : (-20.00,14.00), 4 : (0.00,-7.80), 5 : (-15.00,0.85)}
             }
+        
         if n == 6:
-            return GraphGenerator.ThreePrismGraph()
-        if n > 6 and n < 13:
-            return RigidFlexibleGraph(Integer(graph_repr[n]), pos=positions[n], name='MaxEmbeddingsLamanGraph_' + str(n) + 'vert')
+            G =  GraphGenerator.ThreePrismGraph()
+        elif n > 6 and n < 13:
+            G =  FlexRiGraph(Integer(graph_repr[n]), pos=positions[n], name='MaxEmbeddingsLamanGraph_' + str(n) + 'vert')
         else:
             raise exceptions.ValueError('Only graphs with 6-12 vertices are supported.')
+        if not labeled_from_one:
+            return G
+        else:
+            return FlexRiGraph([(u+1,v+1) for u, v in G.edges(labels=False)],
+                                      pos={v+1:G._pos[v] for v in G._pos},
+                                      name=G.name())
+            
 
     @staticmethod
-    def Q1Graph():
+    def Q1Graph(old_labeling=False):
         r"""
         Return the graph $Q_1$.
 
         EXAMPLE::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator
             sage: GraphGenerator.Q1Graph()
-            Q_1: RigidFlexibleGraph with 7 vertices and 11 edges
+            Q_1: FlexRiGraph with 7 vertices and 11 edges
 
         .. PLOT::
             :scale: 70
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.Q1Graph()
             sphinx_plot(G)
         """
-        return RigidFlexibleGraph([(0, 1), (0, 2), (0, 6), (1, 2), (1, 4), (1, 5), (2, 3), (3, 4), (3, 5), (4, 6), (5, 6)],
-                                  pos={5 : (0.500, 0.866), 4 : (-0.500, 0.866), 6 : (-1.00, 0.000), 3 : (1.00, 0.000),
-                                       2 : (0.500, -0.866), 0 : (-0.500, -0.866), 1 : (0.000, 0.000)},
-                                  name='Q_1')
+        if old_labeling:
+            return FlexRiGraph([(0, 1), (0, 2), (0, 6), (1, 2), (1, 4), (1, 5), (2, 3), (3, 4), (3, 5), (4, 6), (5, 6)],
+                                      pos={5 : (0.500, 0.866), 4 : (-0.500, 0.866), 6 : (-1.00, 0.000), 3 : (1.00, 0.000),
+                                           2 : (0.500, -0.866), 0 : (-0.500, -0.866), 1 : (0.000, 0.000)},
+                                      name='Q_1')
+        G = FlexRiGraph([[5, 6], [5, 7], [6, 7], [1, 5], [2, 6], [2, 4], [1, 3], [3, 7], [4, 7], [1, 4], [2, 3]],
+                          pos={4 : (0.500, 0.866), 3 : (-0.500, 0.866), 1 : (-1.00, 0.000), 2 : (1.00, 0.000),
+                               6 : (0.500, -0.866), 5 : (-0.500, -0.866), 7 : (0.000, 0.000)},
+                          name='Q_1')
+        for cls in G.NAC_colorings_isomorphism_classes():
+            if len(cls)==1:
+                delta = cls[0]
+                if len(delta.blue_edges()) in [4, 7]:
+                    delta.set_name('eta')
+                else:
+                    delta.set_name('zeta')
+            else:
+                for delta in cls:
+                    for edges in [delta.red_edges(), delta.blue_edges()]:
+                        if len(cls)==4 and len(edges)==7:
+                            u,v = [comp for comp in Graph([list(e) for e in edges]).connected_components()
+                                              if len(comp)==2][0]
+                            delta.set_name('epsilon' + (str(u)+str(v) if u<v else str(v)+str(u)))
+                            break
+                        if len(edges)==3:
+                            vertex = edges[0].intersection(edges[1]).intersection(edges[2])[0]
+                            name = 'phi' if [w for w in G.neighbors(vertex) if G.degree(w)==4] else 'psi'
+                            delta.set_name(name + str(vertex))
+                            break
+                        if len(edges)==5:
+                            u,v = [comp for comp in Graph([list(e) for e in edges]).connected_components()
+                                   if len(comp)==2][0]
+                            delta.set_name('gamma' + str(min(u,v)))
+                            break
+        return G
+    
+    @staticmethod
+    def Q2Graph(old_labeling=False):
+        r"""
+        Return the graph $Q_2$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.Q2Graph()
+            Q_2: FlexRiGraph with 8 vertices and 13 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.Q2Graph()
+            sphinx_plot(G)
+        """
+        if old_labeling:
+            G = FlexRiGraph([(0, 4), (0, 5), (0, 6), (1, 2), (1, 3), (1, 6), (2, 5),
+                                 (2, 7), (3, 4), (3, 7), (4, 7), (5, 7), (6, 7)],
+                                pos={0: (-1, 0), 1: (1, 0), 2: (0.5, -0.866025), 3: (0.5, 0.866025),
+                                      4: (-0.5, 0.866025), 5: (-0.5, -0.866025), 6: (0, 0.3), 7: (0, -0.3)},
+                                name='Q_2')
+        else:
+            G = FlexRiGraph([(1, 3), (3, 4), (2, 4), (2, 7), (6, 7), (1, 6), (3, 5),
+                             (4, 5), (5, 6), (5, 7), (5, 8), (1, 8), (2, 8)], 
+                             pos={1: (-1, 0), 2: (1, 0), 4: (0.5, -0.866025), 7: (0.5, 0.866025),
+                                  6: (-0.5, 0.866025), 3: (-0.5, -0.866025), 8: (0, 0.3), 5: (0, -0.3)},
+                             name='Q_2')
+            for col in G.NAC_colorings():
+                num = col.NAC2int()
+                if num == 15487:
+                    col.set_name('alpha2')
+                elif num == 15229:
+                    col.set_name('beta')
+                elif num == 14589:
+                    col.set_name('gamma2')
+                elif num == 14466:
+                    col.set_name('gamma1')
+                elif num == 15106:
+                    col.set_name('delta')
+                elif num == 15360:
+                    col.set_name('alpha1')
+                elif num == 14066:
+                    col.set_name('zeta34')
+                elif num == 13682:
+                    col.set_name('epsilon27')
+                elif num == 12912:
+                    col.set_name('zeta67')
+                elif num == 12784:
+                    col.set_name('epsilon24')
+                elif num == 12687:
+                    col.set_name('epsilon13')
+                elif num == 13581:
+                    col.set_name('epsilon16')
+        return G
+
+    
+    @staticmethod
+    def Q3Graph():
+        r"""
+        Return the graph $Q_3$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.Q3Graph()
+            Q_3: FlexRiGraph with 8 vertices and 14 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.Q3Graph()
+            sphinx_plot(G)
+        """
+        G = FlexRiGraph([(0, 2), (0, 3), (0, 7), (1, 2), (1, 3), (1, 7), (2, 6), (3, 5),
+                                 (4, 5), (4, 6), (4, 7), (5, 6), (5, 7), (6, 7)],
+                                pos={0: (0.5, 0.866), 1: (-0.5, 0.866), 2: (-1, 0), 3: (1, 0),
+                                      4: (0, -0.433), 5: (0.5, -0.866), 6: (-0.5, -0.866), 7: (0, 0)},
+                                name='Q_3')
+        return G
+
+    
+    @staticmethod
+    def Q4Graph():
+        r"""
+        Return the graph $Q_4$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.Q4Graph()
+            Q_4: FlexRiGraph with 8 vertices and 14 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.Q4Graph()
+            sphinx_plot(G)
+        """
+        G = FlexRiGraph([(0, 1), (0, 5), (0, 7), (1, 4), (1, 6), (2, 4), (2, 5), (2, 6),
+                                 (3, 4), (3, 5), (3, 7), (4, 7), (5, 6), (6, 7)],
+                                pos={0: (0.5, -0.866), 
+                                     1: (-0.5, -0.866),
+                                     2: (0.5, 0.866),
+                                     3: (-0.5, 0.866),
+                                     4: (-1.0, 0.0),
+                                     5: (1.0, 0.0),
+                                     6: (0.3, -0.1),
+                                     7: (-0.3, -0.1)},
+                                name='Q_4')
+        return G
+    
+    
+    @staticmethod
+    def Q5Graph():
+        r"""
+        Return the graph $Q_5$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.Q5Graph()
+            Q_5: FlexRiGraph with 8 vertices and 13 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.Q5Graph()
+            sphinx_plot(G)
+        """
+        G = FlexRiGraph([(0, 1), (0, 3), (0, 6), (1, 2), (1, 6), (2, 4), (2, 7),
+                                 (3, 5), (3, 7), (4, 6), (4, 7), (5, 6), (5, 7)],
+                                pos={0: (-0.587, -0.809),
+                                 1: (0.587, -0.809),
+                                 2: (0.951, 0.309),
+                                 3: (-0.951, 0.309),
+                                 4: (0.235, 0.323),
+                                 5: (-0.235, 0.323),
+                                 6: (0.0, -0.4),
+                                 7: (0.0, 1.0)},
+                                name='Q_5')
+        return G
+
+    
+    @staticmethod
+    def Q6Graph():
+        r"""
+        Return the graph $Q_6$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.Q6Graph()
+            Q_6: FlexRiGraph with 8 vertices and 13 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.Q6Graph()
+            sphinx_plot(G)
+        """
+        G = FlexRiGraph([(0, 1), (0, 2), (0, 5), (1, 4), (1, 7), (2, 3), (2, 6), (3, 6),
+                                (3, 7), (4, 6), (4, 7), (5, 6), (5, 7)],
+                                pos={0: (0.0, -0.433),
+                                     1: (-0.5, -0.866),
+                                     2: (0.5, -0.866),
+                                     3: (1.0, 0.0),
+                                     4: (-1.0, 0.0),
+                                     5: (0.0, 0.0),
+                                     6: (0.5, 0.866),
+                                     7: (-0.5, 0.866)},
+                                name='Q_6')
+        return G
 
 
     @staticmethod
@@ -219,29 +510,178 @@ class GraphGenerator():
 
         EXAMPLE::
 
+            sage: from flexrilog import GraphGenerator
             sage: GraphGenerator.S1Graph()
-            S_1: RigidFlexibleGraph with 8 vertices and 14 edges
+            S_1: FlexRiGraph with 8 vertices and 14 edges
 
         .. PLOT::
             :scale: 70
 
-            from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            from flexrilog import GraphGenerator
             G = GraphGenerator.S1Graph()
             sphinx_plot(G)
         """
-        return RigidFlexibleGraph([[6, 1], [2, 3], [5, 4], [4, 3], [6, 3], [6, 5], [1, 2], [8, 3],
+        return FlexRiGraph([[6, 1], [2, 3], [5, 4], [4, 3], [6, 3], [6, 5], [1, 2], [8, 3],
                                    [8, 5], [7, 4], [6, 7], [8, 7], [1, 5], [4, 2]],
                                   pos={1: (-1, 0.8), 2: (-2, -0.2), 3: (0, -1), 4: (-1, 0),
                                        5: (0, 1), 6: (1, 0), 7: (0, -1.75), 8: (1.8, 0)},
                                   name='S_1')
+
+    @staticmethod
+    def S2Graph():
+        r"""
+        Return the graph $S_2$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.S2Graph()
+            S_2: FlexRiGraph with 8 vertices and 14 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.S2Graph()
+            sphinx_plot(G)
+        """
+        return FlexRiGraph([ (5, 3), (2, 6), (4, 0),
+                                     (2, 4), (0, 1), (5, 7),
+                                     (2, 5), (7, 4), (3, 6),
+                                     (1, 6), (7, 6), (3, 4), (1, 7), (5, 0)],
+                                  pos={1: (-0.8,-1.4),
+                                    5: (1., 0.),
+                                    3: (-1.,  0.),
+                                    6: (-0.5, 0.866025),
+                                    2: (0.5, 0.866025),
+                                    4: (-0.5, -0.866025),
+                                    7: (0.5, -0.866025),
+                                    0: (0.8,-1.4)},
+                                  name='S_2')
+
+    @staticmethod
+    def S3Graph():
+        r"""
+        Return the graph $S_3$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.S3Graph()
+            S_3: FlexRiGraph with 8 vertices and 14 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.S3Graph()
+            sphinx_plot(G)
+        """
+        return FlexRiGraph([ (7, 3), (2, 6), (5, 1), (2, 5), (7, 4), (0, 6),
+                                   (2, 7), (4, 5), (3, 6), (4, 6), (3, 5), (7, 1), (0, 7),(0, 1)],
+                                  pos={1: (-0.8,-1.4),
+                                        7: (1., 0.),
+                                        3: (-1.,  0.),
+                                        6: (-0.5, -0.866025),
+                                        2: (0.5, -0.866025),
+                                        5: (-0.5, 0.866025),
+                                        4: (0.5, 0.866025),
+                                        0: (0.8,-1.4)},
+                                  name='S_3')
+
+    @staticmethod
+    def S4Graph():
+        r"""
+        Return the graph $S_4$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.S4Graph()
+            S_4: FlexRiGraph with 8 vertices and 14 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.S4Graph()
+            sphinx_plot(G)
+        """
+        return FlexRiGraph([(1, 4), (2, 3), (3, 6), (6, 5), (2, 5), (5, 4), 
+                                   (6, 1), (3, 4), (2, 1), (5, 7), (5, 8), (7, 4), (7, 8), (4, 8)],
+                                  pos={1: (0.5, -0.866025),
+                                        2: (1., 0.),
+                                        3: (0.5, 0.866025),
+                                        4: (-0.5, 0.866025),
+                                        5: (-1.,  0.),
+                                        6: (-0.5, -0.866025),
+                                        7: (-0.519, 0.30),
+                                        8: (-0.952, 0.550),},
+                                  name='S_4')
+
+    @staticmethod
+    def S5Graph(old_labeling=False):
+        r"""
+        Return the graph $S_5$.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.S5Graph()
+            S_5: FlexRiGraph with 8 vertices and 13 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.S5Graph()
+            sphinx_plot(G)
+        """
+        if not old_labeling:
+            return FlexRiGraph([(1, 2), (1, 3), (1, 4), (1, 5), (2, 6), (2, 3), (3, 7), 
+                               (4, 5), (4, 6), (4, 7), (5, 8), (6, 8), (7, 8)],
+                              pos = {2 : (-0.588, -0.809),
+                                    3 : (0.588, -0.809),
+                                    7 : (0.588, 0.309),
+                                    6 : (-0.588, 0.309),
+                                    4 : (0.235, 0),
+                                    5 : (-0.235, 0),
+                                    1 : (0.000, -0.400),
+                                    8 : (0.000, 0.7)},
+                              name='S_5')
+                
+        return FlexRiGraph([(0, 3), (0, 4), (0, 5), (1, 2), (1, 4), (1, 6), (2, 3), (2, 6), (3, 7), 
+                                   (4, 7), (5, 6), (5, 7), (6, 7)],
+                                  pos = {1 : (-0.588, -0.809),
+                                        2 : (0.588, -0.809),
+                                        3 : (0.588, 0.309),
+                                        4 : (-0.588, 0.309),
+                                        7 : (0.235, 0),
+                                        5 : (-0.235, 0),
+                                        6 : (0.000, -0.400),
+                                        0 : (0.000, 0.7)},
+                                  name='S_5')
 
 
     @staticmethod
     def NoNACGraph():
         r"""
         Return a graph without NAC-coloring.
+
+        EXAMPLE::
+
+            sage: from flexrilog import GraphGenerator
+            sage: GraphGenerator.NoNACGraph()
+            NoNAC: FlexRiGraph with 7 vertices and 12 edges
+
+        .. PLOT::
+            :scale: 70
+
+            from flexrilog import GraphGenerator
+            G = GraphGenerator.NoNACGraph()
+            sphinx_plot(G)
         """
-        return RigidFlexibleGraph(448412,
+        return FlexRiGraph(Integer(448412),
                                   pos={0 : (-0.5,-0.75), 1 : (0.5,0.5), 2 : (1.5,0.5), 3 : (2.5,-0.75),
                                        4 : (0.5,1.5), 5 : (1.5,1.5), 6 : (1,-0.25)},
                                   name='NoNAC')
@@ -252,7 +692,7 @@ class GraphGenerator():
         r"""
         Return the Laman graphs with ``n`` vertices.
 
-        See [CGGKLS2018]_.
+        See [CGGKLS2018b]_.
 
         INPUT:
 
@@ -260,23 +700,23 @@ class GraphGenerator():
 
         EXAMPLE::
 
-            sage: from rigid_and_flexible_graphs.graph_generator import GraphGenerator
+            sage: from flexrilog import GraphGenerator
             sage: [len(GraphGenerator.LamanGraphs(n)) for n in range(3,8)]
             [1, 1, 3, 13, 70]
             sage: GraphGenerator.ThreePrismGraph() in GraphGenerator.LamanGraphs(6)
             True
         """
         if n == 3:
-            return [RigidFlexibleGraph(Integer(i)) for i in [7]]
+            return [FlexRiGraph(Integer(i)) for i in [7]]
         elif n == 4:
-            return [RigidFlexibleGraph(Integer(i)) for i in [31]]
+            return [FlexRiGraph(Integer(i)) for i in [31]]
         elif n == 5:
-            return [RigidFlexibleGraph(Integer(i)) for i in [254, 239, 223]]
+            return [FlexRiGraph(Integer(i)) for i in [254, 239, 223]]
         elif n == 6:
-            return [RigidFlexibleGraph(Integer(i)) for i in [3326, 4011, 7672, 7916,
+            return [FlexRiGraph(Integer(i)) for i in [3326, 4011, 7672, 7916,
                 3934, 10479, 6891, 5791, 3447, 12511, 3451, 3311, 3295]]
         elif n == 7:
-            return [RigidFlexibleGraph(Integer(i)) for i in [
+            return [FlexRiGraph(Integer(i)) for i in [
         120478, 127198, 190686, 104371, 183548, 412894, 102238, 167646, 101630,
         103932, 103805, 560509, 104055, 112469, 112525, 111070, 127575, 190103,
         104365, 174558, 189853, 186013, 192733, 174823, 111335, 102253, 127567,
@@ -286,7 +726,7 @@ class GraphGenerator():
         222443, 567647, 182879, 169631, 659039, 410847, 167711, 174303, 101751,
         396511, 298223, 104171, 173279, 101743, 101615, 101599]]
         elif n == 8:
-            return [RigidFlexibleGraph(Integer(i)) for i in [
+            return [FlexRiGraph(Integer(i)) for i in [
         7510520, 19111408, 6739377, 6740393, 8000953, 6462968, 6475132, 6411644,
         69373436, 6393718, 18995565, 20125169, 20140275, 19617907, 11357278,
         6411934, 12324062, 6418654, 6418797, 12127482, 69311341, 10964186, 69325181,
@@ -374,4 +814,4 @@ class GraphGenerator():
 
 __doc__ = __doc__.replace(
     "{INDEX_OF_METHODS}", (gen_rest_table_index(GraphGenerator))).replace(
-    ":func:`~rigid_and_flexible_graphs.graph_generator.",  ":func:`~rigid_and_flexible_graphs.graph_generator.GraphGenerator.")
+    ":func:`~flexrilog.graph_generator.",  ":func:`~flexrilog.graph_generator.GraphGenerator.")
